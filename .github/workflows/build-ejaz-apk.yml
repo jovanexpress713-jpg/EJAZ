@@ -23,20 +23,15 @@ jobs:
           cache: gradle
 
       - name: Make Gradle executable
-        working-directory: برنامج
-        run: chmod +x gradlew
+        working-directory: 'برنامج'
+        run: chmod +x ./gradlew
 
       - name: Build Debug APK
-        working-directory: برنامج
+        working-directory: 'برنامج'
         run: ./gradlew assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
-        
-       with:
-          name: Ejaz-APK
-          path: برنامج/app/build/outputs/apk/**/*.apk
-
         with:
           name: Ejaz-APK
-          path: برنامج/app/build/outputs/apk/**/*.apk
+          path: 'برنامج/app/build/outputs/apk/**/*.apk'
