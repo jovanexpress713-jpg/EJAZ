@@ -1,0 +1,34 @@
+{
+  "id": "ejaz-transport-app",
+  "short_name": "إيجاز للنقليات",
+  "name": "إيجاز للنقليات – إدارة الأسطول والنقل",
+  "description": "نظام إدارة عمليات النقل الثقيل، حركة الشاحنات والفوترة والتحصيل المعتمد",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "scope": "/",
+  "background_color": "#0F172A",
+  "theme_color": "#F97316",
+  "display": "standalone",
+  "orientation": "portrait",
+  "dir": "rtl",
+  "lang": "ar",
+  "categories": ["business", "productivity", "utilities"]
+}

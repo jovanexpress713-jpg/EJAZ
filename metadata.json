@@ -1,0 +1,6 @@
+{
+  "name": "إيجاز للنقليات",
+  "description": "تطبيق متكامل واحترافي لإدارة أعمال ورحلات وأسطول مؤسسة إيجاز للنقليات – Ejaz Transport.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

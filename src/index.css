@@ -1,0 +1,174 @@
+@import "tailwindcss";
+
+@layer base {
+  * {
+    font-family: 'Cairo', 'Tajawal', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  input, textarea, select {
+    -webkit-user-select: text !important;
+    user-select: text !important;
+    touch-action: manipulation;
+  }
+
+  /* Prevent mobile zoom glitches while keeping comfortable tap target */
+  @media (max-width: 640px) {
+    input, textarea, select {
+      font-size: 15px !important;
+    }
+  }
+
+  button, a {
+    touch-action: manipulation;
+  }
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Print specific styles for invoices and reports */
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 5mm 6mm;
+  }
+  
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box !important;
+    overflow: visible !important;
+  }
+
+  html, body {
+    background: white !important;
+    color: black !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    position: static !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    font-size: 8.5pt !important;
+    line-height: 1.25 !important;
+  }
+
+  #root,
+  #root > div,
+  main,
+  #printable-report-sheet {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    position: static !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  /* Force all scroll containers to expand so no table rows are cut off */
+  .overflow-hidden,
+  .overflow-x-auto,
+  .overflow-y-auto {
+    overflow: visible !important;
+    max-height: none !important;
+    height: auto !important;
+  }
+
+  .no-print,
+  header,
+  nav,
+  footer,
+  button,
+  input,
+  select,
+  #header-quick-add-trip-btn,
+  #header-settings-btn,
+  #header-logout-btn {
+    display: none !important;
+  }
+
+  main {
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  .print-page {
+    box-shadow: none !important;
+    border: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 2mm 0 !important;
+    page-break-inside: auto !important;
+    break-inside: auto !important;
+  }
+
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    page-break-inside: auto !important;
+    break-inside: auto !important;
+    font-size: 9pt !important;
+  }
+
+  th {
+    padding: 4px 5px !important;
+    font-size: 9.5pt !important;
+    font-weight: 800 !important;
+    line-height: 1.25 !important;
+  }
+
+  td {
+    padding: 4px 5px !important;
+    font-size: 9pt !important;
+    line-height: 1.25 !important;
+  }
+
+  tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-after: auto !important;
+  }
+
+  thead {
+    display: table-header-group !important;
+  }
+
+  tfoot {
+    display: table-footer-group !important;
+  }
+}
