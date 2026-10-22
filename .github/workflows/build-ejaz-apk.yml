@@ -1,3 +1,4 @@
+
 name: Build Ejaz APK
 
 on:
@@ -5,6 +6,9 @@ on:
     branches:
       - main
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -15,23 +19,39 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Java
+      - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-          cache: gradle
 
-      - name: Make Gradle executable
-        working-directory: 'برنامج'
-        run: chmod +x ./gradlew
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build web app
+        run: |
+          npm install
+          npm run build
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.2'
+
+      - name: Validate Android project
+        run: |
+          test -f settings.gradle.kts
+          test -f app/build.gradle.kts
+          test -f app/src/main/AndroidManifest.xml
 
       - name: Build Debug APK
-        working-directory: 'برنامج'
-        run: ./gradlew assembleDebug
+        run: gradle assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Ejaz-APK
-          path: 'برنامج/app/build/outputs/apk/**/*.apk'
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
