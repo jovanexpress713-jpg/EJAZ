@@ -1,45 +1,121 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
-    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#0F172A" />
-      <stop offset="100%" stop-color="#1E293B" />
+    <!-- Background Gradient: Deep Luxury Navy -->
+    <linearGradient id="navyBgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#050C1E" />
+      <stop offset="50%" stop-color="#0A1633" />
+      <stop offset="100%" stop-color="#0F234D" />
     </linearGradient>
-    <linearGradient id="orangeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#FB923C" />
-      <stop offset="100%" stop-color="#EA580C" />
+
+    <!-- Royal Blue Gradient -->
+    <linearGradient id="blueGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1D4ED8" />
+      <stop offset="50%" stop-color="#2563EB" />
+      <stop offset="100%" stop-color="#3B82F6" />
     </linearGradient>
+
+    <!-- Rich Gold Gradient -->
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFE082" />
+      <stop offset="30%" stop-color="#FFC107" />
+      <stop offset="70%" stop-color="#D4AF37" />
+      <stop offset="100%" stop-color="#AA7C11" />
+    </linearGradient>
+
+    <!-- Gold Accent Stroke Gradient -->
+    <linearGradient id="goldStrokeGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#B8860B" />
+      <stop offset="50%" stop-color="#FFD700" />
+      <stop offset="100%" stop-color="#FFF8DC" />
+    </linearGradient>
+
+    <!-- Soft Glow Filter -->
+    <filter id="goldGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
   </defs>
-  <!-- Background with rounded corners -->
-  <rect width="512" height="512" rx="112" fill="url(#bgGrad)"/>
-  
-  <!-- Subtle accent ring -->
-  <circle cx="256" cy="256" r="210" stroke="#334155" stroke-width="6" fill="none" opacity="0.4"/>
-  
-  <!-- Stylized Truck Icon -->
-  <g transform="translate(100, 140) scale(0.62)">
-    <!-- Truck Trailer Box -->
-    <rect x="20" y="40" width="280" height="200" rx="16" fill="url(#orangeGrad)"/>
-    <!-- Speed Lines on Trailer -->
-    <path d="M50 80 L160 80 M50 120 L210 120 M50 160 L140 160" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round" opacity="0.85"/>
-    
-    <!-- Truck Cabin -->
-    <path d="M310 100 L390 100 Q430 100 450 140 L480 200 Q490 220 490 240 L310 240 Z" fill="#FFFFFF"/>
-    <!-- Cabin Window -->
-    <path d="M340 120 L400 120 Q420 120 435 150 L450 180 L340 180 Z" fill="#0F172A"/>
-    
-    <!-- Wheels -->
-    <!-- Back Wheel 1 -->
-    <circle cx="100" cy="250" r="45" fill="#0F172A" stroke="#EA580C" stroke-width="10"/>
-    <circle cx="100" cy="250" r="18" fill="#CBD5E1"/>
-    <!-- Back Wheel 2 -->
-    <circle cx="210" cy="250" r="45" fill="#0F172A" stroke="#EA580C" stroke-width="10"/>
-    <circle cx="210" cy="250" r="18" fill="#CBD5E1"/>
-    <!-- Front Wheel -->
-    <circle cx="410" cy="250" r="45" fill="#0F172A" stroke="#EA580C" stroke-width="10"/>
-    <circle cx="410" cy="250" r="18" fill="#CBD5E1"/>
+
+  <!-- App Icon Base: Squircle with Deep Navy & Gold Trim -->
+  <rect width="512" height="512" rx="112" fill="url(#navyBgGrad)"/>
+  <rect x="8" y="8" width="496" height="496" rx="104" fill="none" stroke="url(#goldStrokeGrad)" stroke-width="4" opacity="0.85"/>
+  <rect x="18" y="18" width="476" height="476" rx="94" fill="none" stroke="#1E3A8A" stroke-width="2" opacity="0.6"/>
+
+  <!-- Geometric Decorative Grid & Ambient Rays -->
+  <circle cx="256" cy="230" r="190" stroke="#1E293B" stroke-width="1.5" stroke-dasharray="6 6" fill="none" opacity="0.4"/>
+  <circle cx="256" cy="230" r="140" stroke="#1E3A8A" stroke-width="1" fill="none" opacity="0.3"/>
+
+  <!-- CENTRAL EMBLEM: Management Crest + Accounting Pillars + Logistics Arrow -->
+  <g transform="translate(0, 0)">
+    <!-- 1. Accounting Growth & Financial Ledger Bars (left and right pillars) -->
+    <!-- Bar 1 (Left) -->
+    <rect x="135" y="210" width="22" height="80" rx="6" fill="url(#blueGrad)" opacity="0.8"/>
+    <!-- Bar 2 (Left Mid) -->
+    <rect x="168" y="170" width="22" height="120" rx="6" fill="url(#blueGrad)" opacity="0.9"/>
+    <!-- Bar 3 (Right Mid) -->
+    <rect x="322" y="170" width="22" height="120" rx="6" fill="url(#blueGrad)" opacity="0.9"/>
+    <!-- Bar 4 (Right) -->
+    <rect x="355" y="210" width="22" height="80" rx="6" fill="url(#blueGrad)" opacity="0.8"/>
+
+    <!-- 2. Prominent Gold Heraldic Shield & "V" Monogram Wings -->
+    <!-- Outer Shield Border -->
+    <path d="M256 95 L375 145 C375 255 256 325 256 325 C256 325 137 255 137 145 Z" 
+          fill="#06122C" 
+          stroke="url(#goldGrad)" 
+          stroke-width="5" 
+          stroke-linejoin="round"
+          filter="url(#goldGlow)"/>
+
+    <!-- Inner Shield Blue Fill -->
+    <path d="M256 112 L358 155 C358 245 256 308 256 308 C256 308 154 245 154 155 Z" 
+          fill="#0B1E48" 
+          stroke="#1E40AF" 
+          stroke-width="2"/>
+
+    <!-- 3. Dynamic Victoria Wing / Forward Logistics Jet Arrow (Chevron Wings) -->
+    <!-- Left Wing of V -->
+    <path d="M256 280 L180 160 L212 160 L256 235 L300 160 L332 160 Z" 
+          fill="url(#goldGrad)"/>
+
+    <!-- Top Logistics Fast-Forward Chevrons (Speed & Fleet Tracking) -->
+    <path d="M230 185 L256 150 L282 185 L270 185 L256 166 L242 185 Z" fill="#FFFFFF" opacity="0.9"/>
+    <path d="M236 210 L256 182 L276 210 L266 210 L256 195 L246 210 Z" fill="url(#goldGrad)"/>
+
+    <!-- 4. Compass Star / Strategic Management Crown -->
+    <g transform="translate(256, 128) scale(0.85)">
+      <!-- Star polygon -->
+      <polygon points="0,-18 5,-5 18,0 5,5 0,18 -5,5 -18,0 -5,-5" fill="#FFF8DC"/>
+      <circle cx="0" cy="0" r="3.5" fill="#D4AF37"/>
+    </g>
   </g>
-  
-  <!-- Brand text under icon -->
-  <text x="256" y="430" font-family="'Cairo', 'Tajawal', sans-serif" font-size="44" font-weight="900" fill="#FFFFFF" text-anchor="middle" letter-spacing="2">إيجاز للنقليات</text>
-  <text x="256" y="465" font-family="sans-serif" font-size="20" font-weight="700" fill="#FB923C" text-anchor="middle" letter-spacing="4">EJAZ TRANSPORT</text>
+
+  <!-- Typography at Bottom (Professional Luxury Branding) -->
+  <g transform="translate(256, 385)">
+    <!-- Primary Name: VICTORIA -->
+    <text x="0" y="24" 
+          font-family="'Cairo', 'Montserrat', 'Segoe UI', sans-serif" 
+          font-size="34" 
+          font-weight="900" 
+          fill="url(#goldGrad)" 
+          text-anchor="middle" 
+          letter-spacing="5">
+      VICTORIA
+    </text>
+
+    <!-- Subtitle: LOGISTICS ERP -->
+    <text x="0" y="58" 
+          font-family="'Cairo', 'Montserrat', 'Segoe UI', sans-serif" 
+          font-size="16" 
+          font-weight="700" 
+          fill="#E2E8F0" 
+          text-anchor="middle" 
+          letter-spacing="6" 
+          opacity="0.95">
+      LOGISTICS ERP
+    </text>
+
+    <!-- Decorative Gold Divider Line -->
+    <line x1="-120" y1="36" x2="120" y2="36" stroke="url(#goldGrad)" stroke-width="2" opacity="0.6"/>
+    <circle cx="0" cy="36" r="3.5" fill="#FFD700"/>
+  </g>
 </svg>

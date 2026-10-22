@@ -5,7 +5,14 @@
  * Contact: 771119726
  */
 
-export type UserRole = 'SUPER_ADMIN' | 'OPERATIONS' | 'ACCOUNTANT' | 'VIEWER';
+export type UserRole = 
+  | 'SUPER_ADMIN'      // المالك / مدير النظام
+  | 'COMPANY_MANAGER'  // مدير الشركة
+  | 'ACCOUNTANT'       // المحاسب المالي
+  | 'CASHIER'          // أمين الصندوق
+  | 'OPERATIONS'       // مدير العمليات
+  | 'AUDITOR'          // المراجع والمدقق
+  | 'VIEWER';          // مستعرض (اطلاع)
 
 export type TripStatus = 'NEW' | 'LOADING' | 'IN_TRANSIT' | 'DELIVERED' | 'COMPLETED' | 'CANCELLED';
 
@@ -14,6 +21,8 @@ export type TripType = 'رحلة داخلية' | 'رحلة دولية' | 'رحل
 export type PaymentStatus = 'UNPAID' | 'PARTIAL' | 'PAID';
 
 export type PaymentMethod = 'CASH' | 'BANK_TRANSFER' | 'CHEQUE' | 'CREDIT';
+
+export type SyncStatus = 'SYNCED' | 'PENDING' | 'FAILED';
 
 export type TruckType = 
   | 'CURTAIN' // تريلا ستارة
@@ -56,6 +65,7 @@ export type AuditAction =
   | 'CREATE_TRIP'
   | 'UPDATE_TRIP'
   | 'DELETE_TRIP'
+  | 'APPROVE_TRIP'
   | 'CREATE_CUSTOMER'
   | 'UPDATE_CUSTOMER'
   | 'DELETE_CUSTOMER'
@@ -66,12 +76,38 @@ export type AuditAction =
   | 'UPDATE_TRUCK'
   | 'DELETE_TRUCK'
   | 'CREATE_COLLECTION'
+  | 'UPDATE_COLLECTION'
+  | 'DELETE_COLLECTION'
   | 'CREATE_EXPENSE'
+  | 'UPDATE_EXPENSE'
+  | 'DELETE_EXPENSE'
+  | 'APPROVE_FINANCIAL'
+  | 'CLOSE_CASHBOX'
   | 'CREATE_MAINTENANCE'
   | 'UPDATE_MAINTENANCE'
   | 'BACKUP_RESTORE'
   | 'UPDATE_SETTINGS'
-  | 'MANAGE_USERS';
+  | 'MANAGE_USERS'
+  | 'SYNC_OPERATION'
+  | 'PASSWORD_CHANGE';
+
+export interface UserPermissions {
+  canViewDashboard: boolean;
+  canManageTrips: boolean;
+  canManageCustomers: boolean;
+  canManageDrivers: boolean;
+  canManageTrucks: boolean;
+  canManageMaintenance: boolean;
+  canManageFinancials: boolean;      // سندات، قيود، مصروفات، مقبوضات
+  canCloseCashbox: boolean;          // إقفال الصندوق
+  canApproveOperations: boolean;      // اعتماد العمليات المالية والتشغيلية
+  canViewReports: boolean;
+  canExportReports: boolean;
+  canManageUsers: boolean;
+  canManageSettings: boolean;
+  canBackupRestore: boolean;
+  canAccessSyncMonitor: boolean;
+}
 
 export interface User {
   id: string;
@@ -80,7 +116,13 @@ export interface User {
   role: UserRole;
   phone: string;
   active: boolean;
-  password?: string;
+  password?: string;                 // Plain text backward compatibility
+  passwordHash?: string;             // Salted secure hash
+  passwordSalt?: string;             // Unique salt per account
+  mustChangePassword?: boolean;      // Force password update on first login
+  permissions?: Partial<UserPermissions>;
+  createdAt?: string;
+  lastLoginAt?: string;
 }
 
 export interface Customer {
@@ -93,6 +135,12 @@ export interface Customer {
   status: 'ACTIVE' | 'INACTIVE';
   notes: string;
   createdAt: string;
+  updatedAt?: string;
+  createdBy?: string;
+  createdByName?: string;
+  updatedBy?: string;
+  updatedByName?: string;
+  syncStatus?: SyncStatus;
 }
 
 export interface Driver {
@@ -218,6 +266,16 @@ export interface Trip {
   photoUrl?: string; // base64 or storage url
   createdAt: string;
   updatedAt: string;
+  createdBy?: string;
+  createdByName?: string;
+  updatedBy?: string;
+  updatedByName?: string;
+  needsApproval?: boolean;
+  approvedBy?: string;
+  approvedByName?: string;
+  approvedAt?: string;
+  syncStatus?: SyncStatus;
+  syncChecksum?: string;
 
   // Driver Trip Isolation & Immutable Snapshot Tracking (منع تداخل التقارير وتجميد القيم)
   frozenValues?: {
@@ -258,6 +316,16 @@ export interface MaintenanceRecord {
   description: string;
   status: MaintenanceStatus;
   createdAt: string;
+  updatedAt?: string;
+  createdBy?: string;
+  createdByName?: string;
+  updatedBy?: string;
+  updatedByName?: string;
+  needsApproval?: boolean;
+  approvedBy?: string;
+  approvedByName?: string;
+  approvedAt?: string;
+  syncStatus?: SyncStatus;
 }
 
 export interface CollectionRecord {
@@ -272,6 +340,16 @@ export interface CollectionRecord {
   referenceNumber: string;
   notes: string;
   createdAt: string;
+  updatedAt?: string;
+  createdBy?: string;
+  createdByName?: string;
+  updatedBy?: string;
+  updatedByName?: string;
+  needsApproval?: boolean;
+  approvedBy?: string;
+  approvedByName?: string;
+  approvedAt?: string;
+  syncStatus?: SyncStatus;
 }
 
 export interface ExpenseRecord {
@@ -285,6 +363,16 @@ export interface ExpenseRecord {
   description: string;
   recipient?: string;
   createdAt: string;
+  updatedAt?: string;
+  createdBy?: string;
+  createdByName?: string;
+  updatedBy?: string;
+  updatedByName?: string;
+  needsApproval?: boolean;
+  approvedBy?: string;
+  approvedByName?: string;
+  approvedAt?: string;
+  syncStatus?: SyncStatus;
 }
 
 export interface AuditLog {
@@ -297,6 +385,56 @@ export interface AuditLog {
   entityType: string;
   entityId: string;
   details: string;
+  deviceId?: string;
+  ipOrOrigin?: string;
+}
+
+export interface SyncConfig {
+  enabled: boolean;
+  mode: 'OFFLINE_ONLY' | 'PRIVATE_SERVER' | 'LOCAL_PEER' | 'QR_BUNDLE';
+  serverUrl?: string; // Private company sync endpoint (under company sole control)
+  companySecretKey?: string; // Secret authentication key known only to company
+  deviceId: string;
+  deviceName: string;
+  autoSyncIntervalMinutes: number; // default 5 minutes
+  lastSyncTimestamp?: string;
+  lastSyncStatus?: 'SUCCESS' | 'FAILED' | 'PENDING';
+  lastSyncError?: string;
+}
+
+export interface SyncOutboxItem {
+  id: string;
+  entityType: 'TRIP' | 'CUSTOMER' | 'DRIVER' | 'TRUCK' | 'MAINTENANCE' | 'COLLECTION' | 'EXPENSE' | 'USER' | 'SETTINGS';
+  entityId: string;
+  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'APPROVE';
+  payload: any;
+  timestamp: string;
+  authorId: string;
+  authorName: string;
+  status: 'PENDING' | 'SYNCED' | 'FAILED';
+  retryCount: number;
+  lastError?: string;
+  checksum: string;
+}
+
+export interface SyncDevice {
+  deviceId: string;
+  deviceName: string;
+  registeredUser: string;
+  lastSeenAt: string;
+  ipAddress?: string;
+  status: 'ACTIVE' | 'PENDING' | 'BLOCKED';
+}
+
+export interface ConflictRecord {
+  id: string;
+  entityType: string;
+  entityId: string;
+  localVersion: any;
+  remoteVersion: any;
+  conflictTimestamp: string;
+  resolved: boolean;
+  resolutionChoice?: 'LOCAL' | 'REMOTE' | 'MERGED';
 }
 
 export interface CompanySettings {
@@ -311,6 +449,9 @@ export interface CompanySettings {
   defaultTaxRate: number;
   currency: string;
   termsAndConditions: string;
+  theme?: 'dark' | 'light'; // Full Dark / Light mode toggle
+  syncConfig?: SyncConfig;
+  masterPinConfigured?: boolean;
 }
 
 export interface SavePointRecord {

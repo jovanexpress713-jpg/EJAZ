@@ -2,7 +2,7 @@
  * Copyright © فكتوريا لاين سوفت للأنظمة والبرمجة
  * All Rights Reserved.
  * Developed and Programmed by Victoria Line Soft
- * Contact: 771119726
+ * Contact: +967771119726
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -33,6 +33,8 @@ import { MaintenanceView } from './components/MaintenanceView';
 import { FinancialView } from './components/FinancialView';
 import { ReportsView } from './components/ReportsView';
 import { SettingsView } from './components/SettingsView';
+import { AdminMonitorView } from './components/AdminMonitorView';
+import { ChangePasswordModal } from './components/ChangePasswordModal';
 import { printTripWaybill, shareTripViaWhatsApp } from './utils/tripActions';
 import { SYSTEM_INFO } from './constants/systemInfo';
 import { AboutSystemModal } from './components/AboutSystemModal';
@@ -44,9 +46,12 @@ export default function App() {
   const [appStage, setAppStage] = useState<'SPLASH' | 'LOGIN' | 'MAIN'>('SPLASH');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState<string>('DASHBOARD');
+  const [theme, setThemeState] = useState<'dark' | 'light'>(() => StorageService.getTheme());
+
   const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
   const [isGlobalSavePointsOpen, setIsGlobalSavePointsOpen] = useState(false);
   const [isGlobalDailyHandoverOpen, setIsGlobalDailyHandoverOpen] = useState(false);
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
 
   // Application Data States
   const [trips, setTrips] = useState<Trip[]>([]);
@@ -68,6 +73,27 @@ export default function App() {
   const handleNavigate = useCallback((tab: string) => {
     setActiveTab(tab.toUpperCase());
   }, []);
+
+  // Theme switcher
+  const handleToggleTheme = () => {
+    const nextTheme = theme === 'dark' ? 'light' : 'dark';
+    setThemeState(nextTheme);
+    StorageService.setTheme(nextTheme);
+    if (typeof document !== 'undefined') {
+      const isDark = nextTheme === 'dark';
+      document.documentElement.classList.toggle('dark', isDark);
+      document.body.classList.toggle('dark', isDark);
+    }
+  };
+
+  // Sync theme with DOM
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      const isDark = theme === 'dark';
+      document.documentElement.classList.toggle('dark', isDark);
+      document.body.classList.toggle('dark', isDark);
+    }
+  }, [theme]);
 
   // Load all data from StorageService
   const refreshData = useCallback(() => {
@@ -181,21 +207,43 @@ export default function App() {
 
   // Render current stage
   if (appStage === 'SPLASH') {
-    return <SplashScreen onFinish={handleSplashFinish} />;
+    return (
+      <div 
+        id="ejaz-app-root" 
+        className={`ejaz-app-root min-h-screen ${theme === 'dark' ? 'dark' : ''} bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-cairo transition-colors duration-200`} 
+        dir="rtl"
+      >
+        <SplashScreen onFinish={handleSplashFinish} />
+      </div>
+    );
   }
 
   if (appStage === 'LOGIN' || !currentUser) {
-    return <LoginScreen onLogin={handleLogin} onLoginSuccess={handleLogin} />;
+    return (
+      <div 
+        id="ejaz-app-root" 
+        className={`ejaz-app-root min-h-screen ${theme === 'dark' ? 'dark' : ''} bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-cairo transition-colors duration-200`} 
+        dir="rtl"
+      >
+        <LoginScreen onLogin={handleLogin} onLoginSuccess={handleLogin} />
+      </div>
+    );
   }
 
   const currentTabUpper = activeTab.toUpperCase();
 
   return (
-    <div id="ejaz-app-root" className="min-h-screen bg-slate-100 flex flex-col font-cairo" dir="rtl">
+    <div 
+      id="ejaz-app-root" 
+      className={`ejaz-app-root min-h-screen ${theme === 'dark' ? 'dark' : ''} bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-cairo transition-colors duration-200`} 
+      dir="rtl"
+    >
       {/* Persistent App Header */}
       <Header
         currentUser={currentUser}
         activeTab={currentTabUpper}
+        theme={theme}
+        onToggleTheme={handleToggleTheme}
         setActiveTab={handleNavigate}
         onNavigate={handleNavigate}
         notifications={notifications}
@@ -205,6 +253,7 @@ export default function App() {
         onOpenAbout={() => setIsAboutModalOpen(true)}
         onOpenSavePoints={() => setIsGlobalSavePointsOpen(true)}
         onOpenDailyHandover={() => setIsGlobalDailyHandoverOpen(true)}
+        onOpenChangePassword={() => setIsChangePasswordOpen(true)}
       />
 
       {/* Navigation Sub-bar */}
@@ -233,6 +282,19 @@ export default function App() {
             onPrintWaybill={handlePrintWaybill}
             onShareWhatsApp={handleShareWhatsApp}
             onOpenAddTrip={handleOpenQuickTripModal}
+          />
+        )}
+
+        {currentTabUpper === 'ADMIN_MONITOR' && (
+          <AdminMonitorView
+            currentUser={currentUser}
+            trips={trips}
+            collections={collections}
+            expenses={expenses}
+            auditLogs={auditLogs}
+            settings={settings}
+            onRefreshData={refreshData}
+            onNavigateToTrip={handleViewTrip}
           />
         )}
 
@@ -417,6 +479,17 @@ export default function App() {
         expenses={expenses}
         currentUser={currentUser}
         settings={settings}
+      />
+
+      {/* Change Password Modal */}
+      <ChangePasswordModal
+        isOpen={isChangePasswordOpen}
+        currentUser={currentUser}
+        onClose={() => setIsChangePasswordOpen(false)}
+        onSuccess={(updated) => {
+          setCurrentUser(updated);
+          refreshData();
+        }}
       />
     </div>
   );

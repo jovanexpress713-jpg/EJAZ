@@ -18,6 +18,7 @@ import {
   CompanySettings, 
   AppNotification,
   UserRole,
+  UserPermissions,
   AuditAction,
   TripStatus,
   TruckType,
@@ -31,6 +32,140 @@ import { UnlimitedStorage } from './unlimitedStorage';
 import { createImmutableTripSnapshot } from './driverTrackingLedger';
 import { generateTripUniqueKey } from '../utils/uniqueKeyService';
 import { isExactTruckMatch, normalizeTruckNumber } from '../utils/truckUtils';
+import { SyncEngine } from './syncEngine';
+import { generateSalt } from './security';
+
+export function getDefaultPermissions(role: UserRole): UserPermissions {
+  switch (role) {
+    case 'SUPER_ADMIN':
+      return {
+        canViewDashboard: true,
+        canManageTrips: true,
+        canManageCustomers: true,
+        canManageDrivers: true,
+        canManageTrucks: true,
+        canManageMaintenance: true,
+        canManageFinancials: true,
+        canCloseCashbox: true,
+        canApproveOperations: true,
+        canViewReports: true,
+        canExportReports: true,
+        canManageUsers: true,
+        canManageSettings: true,
+        canBackupRestore: true,
+        canAccessSyncMonitor: true,
+      };
+    case 'COMPANY_MANAGER':
+      return {
+        canViewDashboard: true,
+        canManageTrips: true,
+        canManageCustomers: true,
+        canManageDrivers: true,
+        canManageTrucks: true,
+        canManageMaintenance: true,
+        canManageFinancials: true,
+        canCloseCashbox: false,
+        canApproveOperations: true,
+        canViewReports: true,
+        canExportReports: true,
+        canManageUsers: false,
+        canManageSettings: false,
+        canBackupRestore: false,
+        canAccessSyncMonitor: true,
+      };
+    case 'ACCOUNTANT':
+      return {
+        canViewDashboard: true,
+        canManageTrips: false,
+        canManageCustomers: true,
+        canManageDrivers: false,
+        canManageTrucks: false,
+        canManageMaintenance: false,
+        canManageFinancials: true,
+        canCloseCashbox: false,
+        canApproveOperations: false,
+        canViewReports: true,
+        canExportReports: true,
+        canManageUsers: false,
+        canManageSettings: false,
+        canBackupRestore: false,
+        canAccessSyncMonitor: false,
+      };
+    case 'CASHIER':
+      return {
+        canViewDashboard: true,
+        canManageTrips: false,
+        canManageCustomers: false,
+        canManageDrivers: false,
+        canManageTrucks: false,
+        canManageMaintenance: false,
+        canManageFinancials: true,
+        canCloseCashbox: true,
+        canApproveOperations: false,
+        canViewReports: true,
+        canExportReports: false,
+        canManageUsers: false,
+        canManageSettings: false,
+        canBackupRestore: false,
+        canAccessSyncMonitor: false,
+      };
+    case 'OPERATIONS':
+      return {
+        canViewDashboard: true,
+        canManageTrips: true,
+        canManageCustomers: true,
+        canManageDrivers: true,
+        canManageTrucks: true,
+        canManageMaintenance: true,
+        canManageFinancials: false,
+        canCloseCashbox: false,
+        canApproveOperations: false,
+        canViewReports: true,
+        canExportReports: true,
+        canManageUsers: false,
+        canManageSettings: false,
+        canBackupRestore: false,
+        canAccessSyncMonitor: false,
+      };
+    case 'AUDITOR':
+      return {
+        canViewDashboard: true,
+        canManageTrips: false,
+        canManageCustomers: false,
+        canManageDrivers: false,
+        canManageTrucks: false,
+        canManageMaintenance: false,
+        canManageFinancials: false,
+        canCloseCashbox: false,
+        canApproveOperations: false,
+        canViewReports: true,
+        canExportReports: true,
+        canManageUsers: false,
+        canManageSettings: false,
+        canBackupRestore: false,
+        canAccessSyncMonitor: true,
+      };
+    case 'VIEWER':
+    default:
+      return {
+        canViewDashboard: true,
+        canManageTrips: false,
+        canManageCustomers: false,
+        canManageDrivers: false,
+        canManageTrucks: false,
+        canManageMaintenance: false,
+        canManageFinancials: false,
+        canCloseCashbox: false,
+        canApproveOperations: false,
+        canViewReports: true,
+        canExportReports: false,
+        canManageUsers: false,
+        canManageSettings: false,
+        canBackupRestore: false,
+        canAccessSyncMonitor: false,
+      };
+  }
+}
 
 export interface CompleteDriverTripInput {
   id?: string;
@@ -98,6 +233,7 @@ const STORAGE_KEYS = {
   NOTIFICATIONS: 'ejaz_clean_notifications_v5',
   SAVE_POINTS: 'ejaz_clean_save_points_v5',
   DAILY_HANDOVERS: 'ejaz_clean_daily_handovers_v5',
+  THEME: 'ejaz_theme_mode_v1',
 };
 
 // Initial Seed Data
@@ -112,26 +248,43 @@ const DEFAULT_SETTINGS: CompanySettings = {
   defaultTaxRate: 15,
   currency: 'ر.س',
   termsAndConditions: 'تخضع كافة أعمال النقل واللوجستيات لضوابط الهيئة العامة للنقل في المملكة العربية السعودية. المؤسسة مسؤولة عن سلامة البضائع طوال فترة الرحلة وفق البوليصة المعتمدة.',
+  theme: 'light',
+  syncConfig: SyncEngine.getDefaultConfig(),
 };
 
 const DEFAULT_USERS: User[] = [
   {
     id: 'usr_admin',
     username: 'admin',
-    fullName: 'عبد الله القرني (المدير العام)',
+    fullName: 'عبد الله القرني (المالك / المدير العام)',
     role: 'SUPER_ADMIN',
     phone: '05394417755',
     active: true,
     password: 'admin',
+    mustChangePassword: false,
+    permissions: getDefaultPermissions('SUPER_ADMIN'),
+  },
+  {
+    id: 'usr_manager',
+    username: 'manager',
+    fullName: 'سلطان القحطاني (مدير الشركة)',
+    role: 'COMPANY_MANAGER',
+    phone: '0502233445',
+    active: true,
+    password: '123',
+    mustChangePassword: false,
+    permissions: getDefaultPermissions('COMPANY_MANAGER'),
   },
   {
     id: 'usr_ops',
     username: 'ops',
-    fullName: 'محمد السبيعي (مسؤول العمليات)',
+    fullName: 'محمد السبيعي (مدير العمليات)',
     role: 'OPERATIONS',
     phone: '0501122334',
     active: true,
     password: '123',
+    mustChangePassword: false,
+    permissions: getDefaultPermissions('OPERATIONS'),
   },
   {
     id: 'usr_acc',
@@ -141,15 +294,30 @@ const DEFAULT_USERS: User[] = [
     phone: '0559988776',
     active: true,
     password: '123',
+    mustChangePassword: false,
+    permissions: getDefaultPermissions('ACCOUNTANT'),
   },
   {
-    id: 'usr_staff',
-    username: 'staff',
-    fullName: 'عمر الشهري (مشرف المتابعة)',
-    role: 'VIEWER',
-    phone: '0543322110',
+    id: 'usr_cashier',
+    username: 'cashier',
+    fullName: 'ياسر الغامدي (أمين الصندوق والخزينة)',
+    role: 'CASHIER',
+    phone: '0567788990',
     active: true,
     password: '123',
+    mustChangePassword: false,
+    permissions: getDefaultPermissions('CASHIER'),
+  },
+  {
+    id: 'usr_auditor',
+    username: 'auditor',
+    fullName: 'خالد المطيري (المراجع والمدقق)',
+    role: 'AUDITOR',
+    phone: '0541122998',
+    active: true,
+    password: '123',
+    mustChangePassword: false,
+    permissions: getDefaultPermissions('AUDITOR'),
   },
 ];
 
@@ -388,6 +556,12 @@ export class StorageService {
 
   static saveUser(user: User, actor?: User): void {
     const users = this.getUsers();
+    
+    // Assign default role permissions if not explicitly set
+    if (!user.permissions) {
+      user.permissions = getDefaultPermissions(user.role);
+    }
+
     const idx = users.findIndex(u => u.id === user.id);
     if (idx >= 0) {
       users[idx] = user;
@@ -398,14 +572,153 @@ export class StorageService {
     if (actor) {
       this.addAuditLog(actor, 'MANAGE_USERS', 'User', user.id, `حفظ بيانات المستخدم ${user.fullName} (${user.role})`);
     }
+    SyncEngine.enqueueOperation('USER', user.id, idx >= 0 ? 'UPDATE' : 'CREATE', user, actor);
   }
 
   static deleteUser(userId: string, actor?: User): void {
-    const users = this.getUsers().filter(u => u.id !== userId);
-    setItem(STORAGE_KEYS.USERS, users);
+    const users = this.getUsers();
+    const target = users.find(u => u.id === userId);
+    
+    // Prevent deleting the last active SUPER_ADMIN
+    if (target?.role === 'SUPER_ADMIN') {
+      const activeSuperAdmins = users.filter(u => u.id !== userId && u.role === 'SUPER_ADMIN' && u.active);
+      if (activeSuperAdmins.length === 0) {
+        throw new Error('لا يمكن حذف آخر حساب لمدير النظام / المالك المسؤول عن إدارة المؤسسة.');
+      }
+    }
+
+    const updated = users.filter(u => u.id !== userId);
+    setItem(STORAGE_KEYS.USERS, updated);
     if (actor) {
       this.addAuditLog(actor, 'MANAGE_USERS', 'User', userId, `حذف المستخدم معرف ${userId}`);
     }
+    SyncEngine.enqueueOperation('USER', userId, 'DELETE', { id: userId }, actor);
+  }
+
+  // Reset user password with temporary password (forced change on next login)
+  static resetUserPassword(userId: string, tempPass: string, actor: User): void {
+    const users = this.getUsers();
+    const user = users.find(u => u.id === userId);
+    if (!user) throw new Error('المستخدم غير موجود.');
+
+    user.password = tempPass;
+    user.mustChangePassword = true;
+    setItem(STORAGE_KEYS.USERS, users);
+
+    this.addAuditLog(
+      actor,
+      'MANAGE_USERS',
+      'User',
+      userId,
+      `إعادة تعيين كلمة مرور مؤقتة للمستخدم ${user.fullName} وإلزامه بتغييرها عند الدخول`
+    );
+  }
+
+  // User changes own password
+  static changeUserPassword(userId: string, newPass: string): void {
+    const users = this.getUsers();
+    const user = users.find(u => u.id === userId);
+    if (!user) throw new Error('المستخدم غير موجود.');
+
+    user.password = newPass;
+    user.mustChangePassword = false;
+    user.passwordSalt = generateSalt();
+    setItem(STORAGE_KEYS.USERS, users);
+
+    // If current logged-in user, update session as well
+    const current = this.getCurrentUser();
+    if (current && current.id === userId) {
+      this.setCurrentUser({ ...current, password: newPass, mustChangePassword: false });
+    }
+
+    this.addAuditLog(
+      user,
+      'PASSWORD_CHANGE',
+      'User',
+      userId,
+      `قام المستخدم ${user.fullName} بتحديث كلمة مروره الشخصية وتأمين حسابه بنجاح`
+    );
+  }
+
+  // Dark / Light Theme Persistence (الوضع الليلي والنهاري)
+  static getTheme(): 'dark' | 'light' {
+    if (typeof window === 'undefined') return 'light';
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.THEME);
+      if (stored === 'dark' || stored === 'light') return stored;
+    } catch {
+      // ignore
+    }
+    return this.getSettings().theme || 'light';
+  }
+
+  static setTheme(theme: 'dark' | 'light'): void {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(STORAGE_KEYS.THEME, theme);
+      } catch {
+        // ignore
+      }
+    }
+    setItem(STORAGE_KEYS.THEME, theme, false);
+    UnlimitedStorage.setItem(STORAGE_KEYS.THEME, theme);
+    const settings = this.getSettings();
+    settings.theme = theme;
+    this.saveSettings(settings);
+  }
+
+  // Approve Trip Operation
+  static approveTrip(tripId: string, actor: User): void {
+    const trips = this.getTrips();
+    const trip = trips.find(t => t.id === tripId);
+    if (!trip) return;
+
+    trip.needsApproval = false;
+    trip.approvedBy = actor.id;
+    trip.approvedByName = actor.fullName;
+    trip.approvedAt = new Date().toISOString();
+    this.saveTrip(trip, actor);
+
+    this.addAuditLog(
+      actor,
+      'APPROVE_TRIP',
+      'Trip',
+      tripId,
+      `اعتماد رسمي للرحلة ${trip.tripNumber} بواسطة ${actor.fullName}`
+    );
+  }
+
+  // Approve Financial Record (Collection / Expense)
+  static approveFinancial(type: 'COLLECTION' | 'EXPENSE', id: string, actor: User): void {
+    if (type === 'COLLECTION') {
+      const collections = this.getCollections();
+      const rec = collections.find(c => c.id === id);
+      if (rec) {
+        rec.needsApproval = false;
+        rec.approvedBy = actor.id;
+        rec.approvedByName = actor.fullName;
+        rec.approvedAt = new Date().toISOString();
+        this.saveCollection(rec, actor);
+      }
+    } else {
+      const expenses = this.getExpenses();
+      const rec = expenses.find(e => e.id === id);
+      if (rec) {
+        rec.needsApproval = false;
+        rec.approvedBy = actor.id;
+        rec.approvedByName = actor.fullName;
+        rec.approvedAt = new Date().toISOString();
+        this.saveExpense(rec, actor);
+      }
+    }
+
+    this.addAuditLog(
+      actor,
+      'APPROVE_FINANCIAL',
+      type === 'COLLECTION' ? 'Collection' : 'Expense',
+      id,
+      `اعتماد سند ${type === 'COLLECTION' ? 'قبض' : 'صرف'} بواسطة ${actor.fullName}`
+    );
   }
 
   // Customers

@@ -2,7 +2,7 @@
  * Copyright © فكتوريا لاين سوفت للأنظمة والبرمجة
  * All Rights Reserved.
  * Developed and Programmed by Victoria Line Soft
- * Contact: 771119726
+ * Contact: +967771119726
  */
 
 import React, { useState } from 'react';
@@ -23,10 +23,13 @@ import {
   Info, 
   X, 
   HardDrive,
-  HelpCircle,
   ShieldCheck,
   Smartphone,
-  Building2
+  Building2,
+  Sun,
+  Moon,
+  Key,
+  Database
 } from 'lucide-react';
 import { EjazLogo } from './EjazLogo';
 import { User, AppNotification } from '../types';
@@ -35,6 +38,8 @@ import { NetworkStatusIndicator } from './NetworkStatusIndicator';
 export interface HeaderProps {
   currentUser: User;
   activeTab?: string;
+  theme?: 'dark' | 'light';
+  onToggleTheme?: () => void;
   setActiveTab?: (tab: string) => void;
   onNavigate?: (tab: string) => void;
   notifications?: AppNotification[];
@@ -44,12 +49,15 @@ export interface HeaderProps {
   onOpenAbout?: () => void;
   onOpenSavePoints?: () => void;
   onOpenDailyHandover?: () => void;
+  onOpenChangePassword?: () => void;
   onLogout: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   currentUser,
   activeTab = 'DASHBOARD',
+  theme = 'light',
+  onToggleTheme,
   setActiveTab,
   onNavigate,
   notifications = [],
@@ -59,6 +67,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenAbout,
   onOpenSavePoints,
   onOpenDailyHandover,
+  onOpenChangePassword,
   onLogout,
 }) => {
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
@@ -90,9 +99,12 @@ export const Header: React.FC<HeaderProps> = ({
   const unreadCount = notifications.filter(n => !n.read).length;
 
   const roleLabel = {
-    SUPER_ADMIN: '👑 مدير النظام',
-    OPERATIONS: '🚛 موظف عمليات',
-    ACCOUNTANT: '💰 محاسب مالي',
+    SUPER_ADMIN: '👑 المالك / مدير النظام',
+    COMPANY_MANAGER: '🏢 مدير الشركة',
+    OPERATIONS: '🚛 مدير العمليات',
+    ACCOUNTANT: '💰 المحاسب المالي',
+    CASHIER: '🏦 أمين الصندوق',
+    AUDITOR: '📋 المراجع والمدقق',
     VIEWER: '👁️ مستخدم متابعة',
   }[currentUser.role] || currentUser.role;
 
@@ -114,7 +126,7 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Center: Quick Add Button for Operations & Admins */}
         <div className="hidden md:flex items-center gap-2">
-          {(currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'OPERATIONS') && (
+          {(currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'COMPANY_MANAGER' || currentUser.role === 'OPERATIONS') && (
             <button
               id="header-quick-add-trip-btn"
               type="button"
@@ -125,20 +137,38 @@ export const Header: React.FC<HeaderProps> = ({
               <span>إضافة رحلة جديدة</span>
             </button>
           )}
+
+          {/* Admin Monitor Shortcut Button */}
+          {(currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'COMPANY_MANAGER' || currentUser.role === 'AUDITOR') && (
+            <button
+              type="button"
+              onClick={() => handleTabChange('ADMIN_MONITOR')}
+              className={`px-3 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                currentTabUpper === 'ADMIN_MONITOR'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-slate-800/90 hover:bg-slate-700 text-blue-300 border border-blue-500/30'
+              }`}
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />
+              <span>رقابة المدير والمزامنة</span>
+            </button>
+          )}
         </div>
 
-        {/* Left: Network Status, User Profile, Notifications, Settings, Logout */}
-        <div className="flex items-center gap-2 sm:gap-3">
-          {/* 1TB Storage Engine Status Indicator */}
-          <button
-            type="button"
-            onClick={() => handleTabChange('SETTINGS')}
-            className="hidden xl:flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-800/90 hover:bg-slate-700/90 text-orange-400 border border-orange-500/30 rounded-lg text-xs font-bold transition cursor-pointer shadow-xs"
-            title="نظام التخزين الفائق بسعة 1 تيرابايت (1TB Enterprise Storage Active)"
-          >
-            <HardDrive className="w-3.5 h-3.5 text-orange-400 shrink-0" />
-            <span>سعة 1TB نشطة</span>
-          </button>
+        {/* Left: Theme, Shortcuts, Notifications, Profile, Logout */}
+        <div className="flex items-center gap-1.5 sm:gap-2.5">
+          {/* Dark / Light Mode Toggle */}
+          {onToggleTheme && (
+            <button
+              type="button"
+              onClick={onToggleTheme}
+              className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 hover:text-amber-200 transition cursor-pointer"
+              title={theme === 'dark' ? 'التبديل إلى الوضع النهاري (Light Mode)' : 'التبديل إلى الوضع الليلي (Dark Mode)'}
+            >
+              {theme === 'dark' ? <Sun className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" /> : <Moon className="w-4 h-4 sm:w-5 sm:h-5 text-slate-300" />}
+            </button>
+          )}
+
 
           {/* Save Points to Mobile Shortcut */}
           {onOpenSavePoints && (
@@ -192,7 +222,7 @@ export const Header: React.FC<HeaderProps> = ({
             {showNotificationsDropdown && (
               <div 
                 id="notifications-dropdown-menu"
-                className="absolute left-0 mt-2 w-80 sm:w-96 bg-white text-slate-900 rounded-xl shadow-2xl border border-slate-200 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-150"
+                className="absolute left-0 mt-2 w-80 sm:w-96 bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-150"
                 dir="rtl"
               >
                 <div className="p-3.5 bg-[#0F172A] text-white flex items-center justify-between">
@@ -213,16 +243,16 @@ export const Header: React.FC<HeaderProps> = ({
                     <button
                       type="button"
                       onClick={() => setShowNotificationsDropdown(false)}
-                      className="text-slate-400 hover:text-white p-0.5 rounded"
+                      className="text-slate-400 hover:text-white p-0.5 rounded cursor-pointer"
                     >
                       <X className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
 
-                <div className="max-h-72 overflow-y-auto divide-y divide-slate-100">
+                <div className="max-h-72 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
                   {notifications.length === 0 ? (
-                    <div className="p-6 text-center text-xs text-slate-500">
+                    <div className="p-6 text-center text-xs text-slate-500 dark:text-slate-400">
                       لا توجد إشعارات أو تنبيهات حالية.
                     </div>
                   ) : (
@@ -230,7 +260,7 @@ export const Header: React.FC<HeaderProps> = ({
                       <div 
                         key={notif.id} 
                         className={`p-3 text-xs transition flex items-start gap-2.5 ${
-                          notif.read ? 'bg-white opacity-80' : 'bg-orange-50/70 font-semibold'
+                          notif.read ? 'bg-white dark:bg-slate-900 opacity-80' : 'bg-orange-50/70 dark:bg-orange-950/40 font-semibold'
                         }`}
                       >
                         <div className="mt-0.5 shrink-0">
@@ -243,8 +273,8 @@ export const Header: React.FC<HeaderProps> = ({
                           )}
                         </div>
                         <div className="flex-1 space-y-0.5">
-                          <div className="text-slate-900 font-bold">{notif.title}</div>
-                          <div className="text-slate-600 text-[11px] leading-relaxed">{notif.message}</div>
+                          <div className="text-slate-900 dark:text-white font-bold">{notif.title}</div>
+                          <div className="text-slate-600 dark:text-slate-300 text-[11px] leading-relaxed">{notif.message}</div>
                           <div className="text-[10px] text-slate-400 font-mono mt-1">{notif.date}</div>
                         </div>
                       </div>
@@ -254,6 +284,18 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
             )}
           </div>
+
+          {/* Change Password Shortcut */}
+          {onOpenChangePassword && (
+            <button
+              type="button"
+              onClick={onOpenChangePassword}
+              className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer"
+              title="تغيير كلمة المرور وتأمين الحساب"
+            >
+              <Key className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />
+            </button>
+          )}
 
           {/* Settings Shortcut */}
           <button
@@ -265,7 +307,7 @@ export const Header: React.FC<HeaderProps> = ({
                 ? 'bg-orange-600 text-white' 
                 : 'bg-slate-800 hover:bg-slate-700 text-slate-200'
             }`}
-            title="الإعدادات وسجل العمليات"
+            title="الإعدادات وسجل العمليات والمستخدمين"
           >
             <Settings className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
@@ -321,10 +363,21 @@ export interface NavigationTabsProps {
 export const NavigationTabs: React.FC<NavigationTabsProps> = ({ 
   activeTab, 
   onSelectTab, 
-  setActiveTab 
+  setActiveTab,
+  currentUser
 }) => {
+  const isSuperAdmin = currentUser?.role === 'SUPER_ADMIN';
+  const isCompanyManager = currentUser?.role === 'COMPANY_MANAGER';
+  const isAuditor = currentUser?.role === 'AUDITOR';
+  const isOps = currentUser?.role === 'OPERATIONS';
+  const isAccountant = currentUser?.role === 'ACCOUNTANT';
+  const isCashier = currentUser?.role === 'CASHIER';
+
   const tabs = [
     { id: 'DASHBOARD', label: 'لوحة التحكم', icon: LayoutDashboard },
+    ...(isSuperAdmin || isCompanyManager || isAuditor ? [
+      { id: 'ADMIN_MONITOR', label: 'لوحة متابعة المدير والمزامنة', icon: ShieldCheck }
+    ] : []),
     { id: 'TRIPS', label: 'الرحلات', icon: Truck },
     { id: 'CUSTOMERS', label: 'العملاء', icon: Users },
     { id: 'DRIVERS', label: 'السائقون', icon: UserCheck },
@@ -333,7 +386,7 @@ export const NavigationTabs: React.FC<NavigationTabsProps> = ({
     { id: 'MAINTENANCE', label: 'الصيانة', icon: Wrench },
     { id: 'FINANCIAL', label: 'المالية والتحصيل', icon: CreditCard },
     { id: 'REPORTS', label: 'التقارير', icon: FileText },
-    { id: 'SETTINGS', label: 'الإعدادات', icon: Settings },
+    { id: 'SETTINGS', label: 'الإعدادات والمستخدمين', icon: Settings },
   ];
 
   const handleTabClick = (tabId: string) => {
@@ -348,7 +401,7 @@ export const NavigationTabs: React.FC<NavigationTabsProps> = ({
   const currentTabUpper = (activeTab || '').toUpperCase();
 
   return (
-    <nav className="bg-white border-b border-slate-200 shadow-sm sticky top-16 z-20 overflow-x-auto no-scrollbar no-print">
+    <nav className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shadow-sm sticky top-16 z-20 overflow-x-auto no-scrollbar no-print">
       <div className="max-w-7xl mx-auto px-2 sm:px-6 flex items-center justify-start sm:justify-center gap-1 sm:gap-2 py-1.5 min-w-max">
         {tabs.map(tab => {
           const Icon = tab.icon;
@@ -361,11 +414,11 @@ export const NavigationTabs: React.FC<NavigationTabsProps> = ({
               onClick={() => handleTabClick(tab.id)}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs sm:text-sm font-bold transition whitespace-nowrap cursor-pointer ${
                 isActive
-                  ? 'bg-[#0F172A] text-white shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                  ? 'bg-[#0F172A] dark:bg-slate-800 text-white shadow-sm ring-1 ring-slate-700'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60'
               }`}
             >
-              <Icon className={`w-4 h-4 ${isActive ? 'text-[#F97316]' : 'text-slate-500'}`} />
+              <Icon className={`w-4 h-4 ${isActive ? 'text-[#F97316]' : 'text-slate-400'}`} />
               <span>{tab.label}</span>
             </button>
           );

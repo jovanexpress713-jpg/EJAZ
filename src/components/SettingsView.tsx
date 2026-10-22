@@ -42,10 +42,11 @@ import {
   Copy,
   Info
 } from 'lucide-react';
-import { CompanySettings, AuditLog, User } from '../types';
-import { StorageService } from '../services/storage';
+import { CompanySettings, AuditLog, User, UserRole } from '../types';
+import { StorageService, getDefaultPermissions } from '../services/storage';
 import { SYSTEM_INFO } from '../constants/systemInfo';
 import { downloadFullProjectZip } from '../utils/zipExporter';
+import { generateTemporaryPassword } from '../services/security';
 
 interface SettingsViewProps {
   settings: CompanySettings;
@@ -112,9 +113,101 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [importError, setImportError] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
 
-  useEffect(() => {
-    StorageService.getStorageDiagnostics().then(setStorageDiagnostics);
-  }, [activeTab]);
+  // User Management States
+  const [usersList, setUsersList] = useState<User[]>(() => StorageService.getUsers());
+  const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [selectedUserForReset, setSelectedUserForReset] = useState<User | null>(null);
+  const [tempPassAlert, setTempPassAlert] = useState<string | null>(null);
+  const [userActionError, setUserActionError] = useState<string | null>(null);
+
+  // New user form state
+  const [newFullName, setNewFullName] = useState('');
+  const [newUsername, setNewUsername] = useState('');
+  const [newRole, setNewRole] = useState<UserRole>('OPERATIONS');
+  const [newPhone, setNewPhone] = useState('');
+  const [newTempPass, setNewTempPass] = useState(() => generateTemporaryPassword());
+  const [forceFirstChange, setForceFirstChange] = useState(true);
+
+  const refreshUsers = () => {
+    setUsersList(StorageService.getUsers());
+  };
+
+  const handleCreateUser = (e: React.FormEvent) => {
+    e.preventDefault();
+    setUserActionError(null);
+
+    if (!newFullName.trim() || !newUsername.trim()) {
+      setUserActionError('يرجى ملء الاسم واسم المستخدم.');
+      return;
+    }
+
+    const cleanUsername = newUsername.trim().toLowerCase();
+    const existing = StorageService.getUsers();
+    if (existing.some(u => u.username.toLowerCase() === cleanUsername)) {
+      setUserActionError('اسم المستخدم موجود بالفعل. يرجى اختيار اسم مستخدم آخر.');
+      return;
+    }
+
+    const newUser: User = {
+      id: 'usr_' + Date.now().toString(36),
+      fullName: newFullName.trim(),
+      username: cleanUsername,
+      role: newRole,
+      phone: newPhone.trim(),
+      active: true,
+      password: newTempPass,
+      mustChangePassword: forceFirstChange,
+      permissions: getDefaultPermissions(newRole),
+      createdAt: new Date().toISOString(),
+    };
+
+    StorageService.saveUser(newUser, currentUser);
+    refreshUsers();
+    setShowAddUserModal(false);
+    setTempPassAlert(`تم إنشاء حساب للموظف ${newUser.fullName} بنجاح. كلمة المرور المؤقتة هي: [ ${newTempPass} ] — يرجى تسليمها له.`);
+    setNewFullName('');
+    setNewUsername('');
+    setNewPhone('');
+    setNewTempPass(generateTemporaryPassword());
+  };
+
+  const handleToggleUserActive = (user: User) => {
+    setUserActionError(null);
+    if (user.role === 'SUPER_ADMIN' && user.active) {
+      const activeSuperAdmins = usersList.filter(u => u.id !== user.id && u.role === 'SUPER_ADMIN' && u.active);
+      if (activeSuperAdmins.length === 0) {
+        setUserActionError('لا يمكن تعطيل آخر حساب لمدير النظام.');
+        return;
+      }
+    }
+    const updated = { ...user, active: !user.active };
+    StorageService.saveUser(updated, currentUser);
+    refreshUsers();
+  };
+
+  const handleDeleteUser = (user: User) => {
+    setUserActionError(null);
+    if (!confirm(`هل أنت متأكد من حذف حساب المستخدم "${user.fullName}" نهائياً؟`)) return;
+
+    try {
+      StorageService.deleteUser(user.id, currentUser);
+      refreshUsers();
+    } catch (err: any) {
+      setUserActionError(err?.message || 'حدث خطأ أثناء حذف المستخدم.');
+    }
+  };
+
+  const handleExecuteResetPassword = (user: User) => {
+    const tempPass = generateTemporaryPassword();
+    try {
+      StorageService.resetUserPassword(user.id, tempPass, currentUser);
+      refreshUsers();
+      setSelectedUserForReset(null);
+      setTempPassAlert(`تمت إعادة تعيين كلمة مرور الموظف ${user.fullName} إلى: [ ${tempPass} ]. سيلتزم بتغييرها فور تسجيل الدخول.`);
+    } catch (err: any) {
+      setUserActionError(err?.message || 'فشل إعادة تعيين كلمة المرور.');
+    }
+  };
 
   const handleRequestPersistence = async () => {
     setIsVerifyingStorage(true);
@@ -304,11 +397,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         <button
           onClick={() => setActiveTab('BACKUP')}
           className={`px-4 py-2.5 text-xs sm:text-sm font-bold border-b-2 transition whitespace-nowrap cursor-pointer flex items-center gap-2 ${
-            activeTab === 'BACKUP' ? 'border-[#F97316] text-[#F97316]' : 'border-transparent text-slate-500 hover:text-slate-900'
+            activeTab === 'BACKUP' ? 'border-[#F97316] text-[#F97316]' : 'border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white'
           }`}
         >
-          <Database className="w-4 h-4 text-orange-500" />
-          <span>سعة التخزين (1 تيرابايت - 1TB) والنسخ الاحتياطي</span>
+          <RotateCcw className="w-4 h-4 text-orange-500" />
+          <span>النسخ الاحتياطي والاستعادة</span>
         </button>
 
         <button
@@ -437,50 +530,367 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       )}
 
-      {/* 2. ROLES MATRIX */}
+      {/* 2. USERS & ROLES MANAGEMENT */}
       {activeTab === 'ROLES' && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
-          <h3 className="text-sm font-black text-slate-900">مصفوفة الصلاحيات والأدوار المعتمدة بالنظام</h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50">
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-bold text-slate-900 text-sm">المدير العام (Super Admin)</span>
-                <span className="text-[10px] bg-red-100 text-red-800 font-bold px-2 py-0.5 rounded">صلاحية كاملة</span>
+        <div className="space-y-6">
+          {/* Action Alert Banner */}
+          {tempPassAlert && (
+            <div className="p-4 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 rounded-xl text-xs text-emerald-800 dark:text-emerald-200 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                <span className="font-bold">{tempPassAlert}</span>
               </div>
-              <p className="text-xs text-slate-600">
-                الوصول لجميع الوحدات، إضافة وتعديل وحذف الرحلات، السائقين، الشاحنات، إصدار السندات، الوصول للإعدادات وسجل الرقابة.
-              </p>
+              <button
+                type="button"
+                onClick={() => setTempPassAlert(null)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {userActionError && (
+            <div className="p-4 bg-red-50 dark:bg-red-950/60 border border-red-300 dark:border-red-800 rounded-xl text-xs text-red-800 dark:text-red-200 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-red-600 shrink-0" />
+                <span>{userActionError}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setUserActionError(null)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {/* User List Header */}
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5 shadow-xs space-y-4">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div>
+                <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
+                  <UserCheck className="w-5 h-5 text-orange-500" />
+                  <span>إدارة حسابات الموظفين والمستخدمين ({usersList.length})</span>
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  إنشاء الحسابات، تعيين الصلاحيات، إصدار كلمات المرور المؤقتة، والتحكم في إيقاف الحسابات.
+                </p>
+              </div>
+
+              {isSuperAdmin && (
+                <button
+                  type="button"
+                  onClick={() => setShowAddUserModal(true)}
+                  className="px-4 py-2 bg-[#F97316] hover:bg-orange-600 text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <span>+ إضافة موظف جديد</span>
+                </button>
+              )}
             </div>
 
-            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50">
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-bold text-slate-900 text-sm">التشغيل والعمليات (Operations)</span>
-                <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded">تشغيلي</span>
-              </div>
-              <p className="text-xs text-slate-600">
-                إدارة الرحلات وتحديث حالاتها، إدارة السائقين، متابعة الأسطول وجدولة الصيانة. لا يمكنه تعديل إعدادات المؤسسة.
-              </p>
-            </div>
+            {/* Users Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-right text-xs">
+                <thead className="bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700 font-bold">
+                  <tr>
+                    <th className="p-3">اسم الموظف</th>
+                    <th className="p-3">اسم المستخدم</th>
+                    <th className="p-3">الدور الوظيفي</th>
+                    <th className="p-3">رقم الهاتف</th>
+                    <th className="p-3">الحالة</th>
+                    <th className="p-3 text-center">الإجراءات</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-700 text-slate-800 dark:text-slate-200">
+                  {usersList.map(u => (
+                    <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                      <td className="p-3 font-bold text-slate-900 dark:text-white">
+                        {u.fullName}
+                      </td>
+                      <td className="p-3 font-mono text-[11px] text-slate-500 dark:text-slate-400">
+                        {u.username}
+                      </td>
+                      <td className="p-3">
+                        <span 
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            u.role === 'SUPER_ADMIN' 
+                              ? 'bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300'
+                              : u.role === 'COMPANY_MANAGER'
+                              ? 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300'
+                              : u.role === 'OPERATIONS'
+                              ? 'bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300'
+                              : u.role === 'ACCOUNTANT'
+                              ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
+                              : u.role === 'CASHIER'
+                              ? 'bg-teal-100 dark:bg-teal-950 text-teal-700 dark:text-teal-300'
+                              : 'bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300'
+                          }`}
+                        >
+                          {u.role === 'SUPER_ADMIN' ? 'المالك / مدير النظام' :
+                           u.role === 'COMPANY_MANAGER' ? 'مدير الشركة' :
+                           u.role === 'OPERATIONS' ? 'مدير العمليات' :
+                           u.role === 'ACCOUNTANT' ? 'المحاسب المالي' :
+                           u.role === 'CASHIER' ? 'أمين الصندوق' :
+                           u.role === 'AUDITOR' ? 'المراجع والمدقق' : 'مستعرض'}
+                        </span>
+                      </td>
+                      <td className="p-3 font-mono text-[11px]">
+                        {u.phone || '-'}
+                      </td>
+                      <td className="p-3">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          u.active 
+                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' 
+                            : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300'
+                        }`}>
+                          {u.active ? 'نشط' : 'معطل'}
+                        </span>
+                      </td>
+                      <td className="p-3 text-center">
+                        <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                          {isSuperAdmin && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => handleExecuteResetPassword(u)}
+                                className="px-2 py-1 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/60 dark:hover:bg-amber-900/60 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-700 rounded-lg text-[10.5px] font-bold transition cursor-pointer"
+                                title="إعادة تعيين كلمة مرور مؤقتة للموظف"
+                              >
+                                كلمة مؤقتة
+                              </button>
 
-            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50">
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-bold text-slate-900 text-sm">المحاسب المالي (Accountant)</span>
-                <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded">مالي</span>
-              </div>
-              <p className="text-xs text-slate-600">
-                إصدار سندات القبض والصرف، استخراج كشوفات الحساب، مراجعة الضرائب والعهد، والتقارير المالية التنفيذية.
-              </p>
-            </div>
+                              {u.id !== currentUser.id && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleUserActive(u)}
+                                  className="px-2 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg text-[10.5px] font-bold transition cursor-pointer"
+                                >
+                                  {u.active ? 'تعطيل' : 'تفعيل'}
+                                </button>
+                              )}
 
-            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50">
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-bold text-slate-900 text-sm">المشاهد (Viewer)</span>
-                <span className="text-[10px] bg-slate-200 text-slate-700 font-bold px-2 py-0.5 rounded">قراءة فقط</span>
+                              {u.id !== currentUser.id && u.role !== 'SUPER_ADMIN' && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteUser(u)}
+                                  className="px-2 py-1 bg-red-50 hover:bg-red-100 dark:bg-red-950/60 dark:hover:bg-red-900/60 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 rounded-lg text-[10.5px] font-bold transition cursor-pointer"
+                                >
+                                  حذف
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Modal: Add New Employee */}
+          {showAddUserModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs select-none">
+              <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full p-6 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <UserCheck className="w-5 h-5 text-orange-500" />
+                    <span>إنشاء حساب موظف جديد</span>
+                  </h3>
+                  <button 
+                    type="button" 
+                    onClick={() => setShowAddUserModal(false)}
+                    className="text-slate-400 hover:text-slate-600 dark:hover:text-white"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <form onSubmit={handleCreateUser} className="space-y-3.5">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      اسم الموظف الكامل
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={newFullName}
+                      onChange={e => setNewFullName(e.target.value)}
+                      placeholder="مثال: عبد الرحمن الشهري"
+                      className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-orange-500"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        اسم المستخدم (للدخول)
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={newUsername}
+                        onChange={e => setNewUsername(e.target.value)}
+                        placeholder="مثال: alshahri"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-orange-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        رقم الجوال
+                      </label>
+                      <input
+                        type="tel"
+                        value={newPhone}
+                        onChange={e => setNewPhone(e.target.value)}
+                        placeholder="05xxxxxxxx"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-orange-500 font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      الدور والصلاحيات
+                    </label>
+                    <select
+                      value={newRole}
+                      onChange={e => setNewRole(e.target.value as UserRole)}
+                      className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-orange-500 cursor-pointer"
+                    >
+                      <option value="OPERATIONS">مدير العمليات والتشغيل (الرحلات والأسطول)</option>
+                      <option value="COMPANY_MANAGER">مدير الشركة (إدارة العمليات والتقارير والرقابة)</option>
+                      <option value="ACCOUNTANT">المحاسب المالي (القيود والسندات والتقارير المالية)</option>
+                      <option value="CASHIER">أمين الصندوق (المقبوضات والمدفوعات وإقفال الخزينة)</option>
+                      <option value="AUDITOR">المراجع والمدقق الداخلي (اطلاع ومراجعة فقط)</option>
+                      <option value="VIEWER">مستعرض (متابعة فقط)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      كلمة المرور المؤقتة (تُسلم للموظف)
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        required
+                        value={newTempPass}
+                        onChange={e => setNewTempPass(e.target.value)}
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono font-bold tracking-wider"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setNewTempPass(generateTemporaryPassword())}
+                        className="px-2.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 shrink-0 cursor-pointer"
+                      >
+                        توليد
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1">
+                    <input
+                      type="checkbox"
+                      id="forceFirstChangeCheck"
+                      checked={forceFirstChange}
+                      onChange={e => setForceFirstChange(e.target.checked)}
+                      className="rounded border-slate-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
+                    />
+                    <label htmlFor="forceFirstChangeCheck" className="text-xs text-slate-600 dark:text-slate-300 cursor-pointer">
+                      إلزام الموظف بتغيير كلمة المرور المؤقتة فور أول تسجيل دخول
+                    </label>
+                  </div>
+
+                  <div className="pt-3 flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowAddUserModal(false)}
+                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold transition cursor-pointer"
+                    >
+                      إلغاء
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-5 py-2.5 bg-[#F97316] hover:bg-orange-600 text-white rounded-xl text-xs font-bold transition shadow-sm cursor-pointer"
+                    >
+                      حفظ وإنشاء الحساب
+                    </button>
+                  </div>
+                </form>
               </div>
-              <p className="text-xs text-slate-600">
-                الاطلاع على حركة الرحلات والتقارير بدون إمكانية الحذف أو التعديل أو إضافة بيانات جديدة.
-              </p>
+            </div>
+          )}
+
+          {/* Roles Description Matrix */}
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs p-5 space-y-4">
+            <h3 className="text-sm font-black text-slate-900 dark:text-white">
+              مصفوفة الصلاحيات والأدوار المعتمدة بمؤسسة إيجاز (Victoria Logistics ERP)
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+              <div className="p-3.5 rounded-xl border border-red-200 dark:border-red-900/40 bg-red-50/40 dark:bg-red-950/20">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="font-bold text-slate-900 dark:text-white text-xs">المالك / مدير النظام (Super Admin)</span>
+                  <span className="text-[10px] bg-red-100 text-red-800 font-bold px-1.5 py-0.5 rounded">صلاحية شاملة</span>
+                </div>
+                <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                  إدارة المستخدمين، الأدوار، الصلاحيات، الإعدادات، بيانات الشركة، النسخ الاحتياطية وسجل المراقبة الشامل.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl border border-amber-200 dark:border-amber-900/40 bg-amber-50/40 dark:bg-amber-950/20">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="font-bold text-slate-900 dark:text-white text-xs">مدير الشركة (Company Manager)</span>
+                  <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-1.5 py-0.5 rounded">إداري تنفيذي</span>
+                </div>
+                <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                  متابعة العمليات والعملاء والأسطول، التقارير الإدارية، واعتماد العمليات الحساسة دون الوصول لإدارة المستخدمين.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl border border-blue-200 dark:border-blue-900/40 bg-blue-50/40 dark:bg-blue-950/20">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="font-bold text-slate-900 dark:text-white text-xs">مدير العمليات (Operations)</span>
+                  <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-1.5 py-0.5 rounded">تشغيلي</span>
+                </div>
+                <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                  الرحلات وإصدار البوالص، العملاء، السائقون كسجلات تشغيلية، الشاحنات والصيانة ومتابعة خطوط السير.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl border border-emerald-200 dark:border-emerald-900/40 bg-emerald-50/40 dark:bg-emerald-950/20">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="font-bold text-slate-900 dark:text-white text-xs">المحاسب المالي (Accountant)</span>
+                  <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded">مالي ومحاسبي</span>
+                </div>
+                <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                  الحسابات، القيود، السندات، الإيرادات والمصروفات، الأرصدة، كشوفات الحساب والتقارير المالية والضريبية.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl border border-teal-200 dark:border-teal-900/40 bg-teal-50/40 dark:bg-teal-950/20">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="font-bold text-slate-900 dark:text-white text-xs">أمين الصندوق (Cashier)</span>
+                  <span className="text-[10px] bg-teal-100 text-teal-800 font-bold px-1.5 py-0.5 rounded">خزينة ونقدية</span>
+                </div>
+                <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                  سندات القبض والصرف، استلام وتسليم النقدية، حركات الصندوق اليومية ومحاضر إقفال الصندوق.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl border border-purple-200 dark:border-purple-900/40 bg-purple-50/40 dark:bg-purple-950/20">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="font-bold text-slate-900 dark:text-white text-xs">المراجع والمدقق (Auditor)</span>
+                  <span className="text-[10px] bg-purple-100 text-purple-800 font-bold px-1.5 py-0.5 rounded">رقابة وتدقيق</span>
+                </div>
+                <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                  الاطلاع والمراجعة والتدقيق على كافة السجلات والعمليات دون إمكانية التعديل أو الحذف المباشر.
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -537,233 +947,31 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       {/* 4. BACKUP & RESTORE / 1 TERABYTE ENTERPRISE STORAGE */}
       {activeTab === 'BACKUP' && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-6">
-          {/* 1 Terabyte Enterprise Storage Engine Card */}
-          <div className="p-5 sm:p-6 rounded-2xl border-2 border-orange-500/40 bg-gradient-to-br from-orange-50/50 via-white to-amber-50/40 shadow-sm space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="flex items-start gap-3.5">
-                <div className="p-3 bg-[#0F172A] text-orange-400 rounded-xl shadow-md shrink-0">
-                  <HardDrive className="w-6 h-6 text-orange-400" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-base font-black text-slate-900">
-                      محرك التخزين الفائق بسعة 1 تيرابايت (1 Terabyte Enterprise Storage)
-                    </h3>
-                    <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-black px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      1TB Storage Active
-                    </span>
-                    <span className="bg-orange-100 text-orange-800 border border-orange-300 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                      سعة مفتوحة لا نهائية
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-600 mt-1 max-w-2xl leading-relaxed">
-                    تمت ترقية نظام إيجاز بمحرك <strong className="text-slate-900">IndexedDB Enterprise V2</strong> مع دعم الحماية الدائمة ومحرك الوسائط الضخمة لحفظ ما يصل إلى <strong className="text-orange-700">1 تيرابايت (1,024 جيجابايت)</strong> من الرحلات، السندات المالية، العقود، صور بوالص الشحن، وإثباتات التسليم دون أي سقف تقييدي.
-                  </p>
-                </div>
+          {/* Information & Advanced Diagnostics Link Card */}
+          <div className="p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3.5">
+              <div className="p-2.5 bg-orange-500/10 text-orange-600 dark:text-orange-400 rounded-xl shrink-0">
+                <Database className="w-5 h-5" />
               </div>
-
-              {/* Action Buttons */}
-              <div className="flex items-center gap-2 shrink-0 self-end sm:self-center flex-wrap">
-                <button
-                  type="button"
-                  onClick={handleBenchmark1TB}
-                  disabled={isVerifyingStorage}
-                  className="px-3.5 py-2 bg-[#0F172A] hover:bg-slate-800 text-orange-400 border border-orange-500/40 text-xs font-bold rounded-xl shadow-sm transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                  title="اختبار سرعة وكفاءة التخزين بسعة 1 تيرابايت"
-                >
-                  <Zap className={`w-3.5 h-3.5 text-orange-400 ${isVerifyingStorage ? 'animate-bounce' : ''}`} />
-                  <span>فحص كفاءة الـ 1TB</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleSyncAndVerify}
-                  disabled={isVerifyingStorage}
-                  className="px-3.5 py-2 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-bold rounded-xl shadow-sm transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                  title="فحص ومزامنة قاعدة البيانات"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 text-slate-600 ${isVerifyingStorage ? 'animate-spin' : ''}`} />
-                  <span>مزامنة وفحص</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleRequestPersistence}
-                  disabled={isVerifyingStorage}
-                  className="px-3.5 py-2 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold rounded-xl shadow-sm transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                  title="طلب تثبيت الحماية الدائمة من المتصفح"
-                >
-                  <Lock className="w-3.5 h-3.5" />
-                  <span>تأكيد الحماية الدائمة</span>
-                </button>
+              <div className="space-y-0.5">
+                <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                  محرك التخزين المحلي الآمن وقاعدة البيانات المتقدمة
+                </h4>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed max-w-xl">
+                  تُحفظ كافة العمليات والبيانات محلياً على جهازك بأعلى درجات الخصوصية والأمان. للاطلاع على المواصفات الفنية وسعة التخزين وإجراء فحص الكفاءة المعياري، تفضل بزيارة قسم «حول النظام».
+                </p>
               </div>
             </div>
-
-            {/* Benchmark Test Results Banner */}
-            {benchmarkResult && (
-              <div className={`p-4 rounded-xl border text-xs font-bold flex items-center justify-between gap-3 animate-fadeIn ${
-                benchmarkResult.success ? 'bg-emerald-950 text-emerald-300 border-emerald-500/60 shadow-lg' : 'bg-red-950 text-red-300 border-red-500/60'
-              }`}>
-                <div className="flex items-center gap-2.5">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-                  <div>
-                    <div className="text-sm font-black text-white">نتيجة فحص سرعة وقدرة محرك الـ 1 تيرابايت:</div>
-                    <p className="text-emerald-300 font-normal mt-0.5">{benchmarkResult.message}</p>
-                  </div>
-                </div>
-                <div className="text-left shrink-0 font-mono text-xs bg-emerald-900/60 px-3 py-1.5 rounded-lg border border-emerald-700">
-                  <span className="text-emerald-400 font-black">{benchmarkResult.writeSpeedMs} ms</span> زمن الاستجابة
-                </div>
-              </div>
+            {onOpenAbout && (
+              <button
+                type="button"
+                onClick={onOpenAbout}
+                className="px-3.5 py-2 bg-white dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-xl transition shadow-xs flex items-center gap-1.5 shrink-0 cursor-pointer"
+              >
+                <Info className="w-3.5 h-3.5 text-orange-500" />
+                <span>المواصفات الفنية في حول النظام</span>
+              </button>
             )}
-
-            {/* Notification alert if action taken */}
-            {storageMsg && !benchmarkResult && (
-              <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-bold flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>{storageMsg}</span>
-              </div>
-            )}
-
-            {/* 1 Terabyte Capacity Visual Progress Gauge */}
-            <div className="bg-slate-900 text-white p-4 sm:p-5 rounded-2xl border border-slate-800 shadow-md space-y-3">
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <Gauge className="w-4 h-4 text-orange-400" />
-                  <span className="text-xs sm:text-sm font-black text-white">مؤشر سعة الـ 1 تيرابايت (1 TB Enterprise Storage Meter):</span>
-                </div>
-                <div className="text-xs font-mono text-slate-300">
-                  المستخدم: <strong className="text-orange-400">{storageDiagnostics?.usageFormatted || '0 بايت'}</strong> / سعة الحفظ القصوى: <strong className="text-emerald-400">1,024 GB (1 TB)</strong>
-                </div>
-              </div>
-
-              {/* Progress bar */}
-              <div className="w-full bg-slate-800 h-3 rounded-full overflow-hidden p-0.5 border border-slate-700">
-                <div 
-                  className="bg-gradient-to-r from-emerald-500 via-teal-400 to-orange-500 h-full rounded-full transition-all duration-500 min-w-[6px]"
-                  style={{ width: `${Math.max(0.6, Math.min(100, storageDiagnostics?.usageOf1TBPercent || 0.6))}%` }}
-                />
-              </div>
-
-              <div className="flex items-center justify-between text-[11px] text-slate-400 flex-wrap gap-2">
-                <span className="flex items-center gap-1 text-emerald-400 font-bold">
-                  <Check className="w-3.5 h-3.5" />
-                  المساحة المتبقية من الـ 1 تيرابايت: {storageDiagnostics?.remaining1TBFormatted || '1,023.9 GB متبقي'}
-                </span>
-                <span className="text-slate-300">
-                  الطاقة الاستيعابية التقديرية: <strong className="text-white">أكثر من 10,000,000 رحلة وسند مالي وبوليصة شحن</strong>
-                </span>
-              </div>
-            </div>
-
-            {/* Storage Metric Panels */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-xs">
-                <div className="text-[11px] font-bold text-slate-500 mb-1 flex items-center gap-1">
-                  <Database className="w-3.5 h-3.5 text-orange-500" />
-                  <span>سقف السعة المتاح</span>
-                </div>
-                <div className="text-sm sm:text-base font-black text-slate-900 flex items-center gap-1">
-                  <span>1 تيرابايت (1 TB)</span>
-                </div>
-                <div className="text-[10px] text-emerald-600 font-bold mt-0.5">مفتوحة حتى سعة القرص الصلب</div>
-              </div>
-
-              <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-xs">
-                <div className="text-[11px] font-bold text-slate-500 mb-1 flex items-center gap-1">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>الحماية من المسح التلقائي</span>
-                </div>
-                <div className="text-sm sm:text-base font-black text-emerald-700">
-                  {storageDiagnostics?.isPersistent ? 'تخزين دائم مؤكد 100%' : 'تخزين محلي مؤمن'}
-                </div>
-                <div className="text-[10px] text-slate-500 mt-0.5">Persistent Storage API</div>
-              </div>
-
-              <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-xs">
-                <div className="text-[11px] font-bold text-slate-500 mb-1 flex items-center gap-1">
-                  <HardDrive className="w-3.5 h-3.5 text-blue-600" />
-                  <span>حجم البيانات الحالية</span>
-                </div>
-                <div className="text-sm sm:text-base font-black text-slate-900 font-mono">
-                  {storageDiagnostics?.usageFormatted || '0 بايت'}
-                </div>
-                <div className="text-[10px] text-slate-500 mt-0.5">بيانات حية وفورية مشفرة</div>
-              </div>
-
-              <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-xs">
-                <div className="text-[11px] font-bold text-slate-500 mb-1 flex items-center gap-1">
-                  <Server className="w-3.5 h-3.5 text-purple-600" />
-                  <span>المستندات والوسائط الثقيلة</span>
-                </div>
-                <div className="text-sm sm:text-base font-black text-slate-900 font-mono">
-                  {(storageDiagnostics?.blobsCount || 0) > 0 ? `${storageDiagnostics?.blobsCount} ملف` : '1TB Media Engine'}
-                </div>
-                <div className="text-[10px] text-slate-500 mt-0.5">بوالص، صور، ومستندات PDF</div>
-              </div>
-            </div>
-
-            {/* Stored Records Breakdown Bar */}
-            <div className="bg-slate-900 text-white p-3.5 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs">
-              <div className="flex items-center gap-2">
-                <Layers className="w-4 h-4 text-orange-400" />
-                <span className="font-bold">إحصائية السجلات المحفوظة في قاعدة البيانات (1TB Store):</span>
-              </div>
-              <div className="flex flex-wrap items-center gap-2 sm:gap-4 font-mono text-[11px]">
-                <span className="bg-slate-800 px-2.5 py-1 rounded-lg">
-                  الرحلات: <strong className="text-orange-400 font-bold">{storageDiagnostics?.tripsCount ?? 0}</strong>
-                </span>
-                <span className="bg-slate-800 px-2.5 py-1 rounded-lg">
-                  السائقين: <strong className="text-orange-400 font-bold">{storageDiagnostics?.driversCount ?? 0}</strong>
-                </span>
-                <span className="bg-slate-800 px-2.5 py-1 rounded-lg">
-                  الشاحنات: <strong className="text-orange-400 font-bold">{storageDiagnostics?.trucksCount ?? 0}</strong>
-                </span>
-                <span className="bg-slate-800 px-2.5 py-1 rounded-lg">
-                  العملاء: <strong className="text-orange-400 font-bold">{storageDiagnostics?.customersCount ?? 0}</strong>
-                </span>
-                <span className="bg-slate-800 px-2.5 py-1 rounded-lg">
-                  المالية: <strong className="text-emerald-400 font-bold">{(storageDiagnostics?.collectionsCount ?? 0) + (storageDiagnostics?.expensesCount ?? 0)}</strong>
-                </span>
-                <span className="bg-slate-800 px-2.5 py-1 rounded-lg">
-                  سجل الرقابة: <strong className="text-blue-400 font-bold">{storageDiagnostics?.logsCount ?? 0}</strong>
-                </span>
-              </div>
-            </div>
-
-            {/* 1TB Architecture Explanation Pillars */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
-                <div className="font-bold text-slate-800 flex items-center gap-1.5">
-                  <Database className="w-3.5 h-3.5 text-orange-600" />
-                  <span>1. محرك السجلات فائقة السرعة</span>
-                </div>
-                <p className="text-slate-600 text-[11px] leading-relaxed">
-                  يستخدم IndexedDB V2 بنية جدولية بدون ذاكرة مؤقتة مقيدة، مما يسمح بتسجيل عشرات الملايين من الرحلات دون بطء في البحث أو الفلترة.
-                </p>
-              </div>
-
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
-                <div className="font-bold text-slate-800 flex items-center gap-1.5">
-                  <Server className="w-3.5 h-3.5 text-blue-600" />
-                  <span>2. مخزن الوسائط والمرفقات (1TB Blobs)</span>
-                </div>
-                <p className="text-slate-600 text-[11px] leading-relaxed">
-                  مخزن ثنائي مستقل لحفظ صور السائقين ورخص القيادة وبوالص الشحن الممسوحة ضوئياً ومستندات الفحص الدوري بحجم يصل حتى 1 تيرابايت.
-                </p>
-              </div>
-
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
-                <div className="font-bold text-slate-800 flex items-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>3. حماية دائمة ضد الحذف (Zero Eviction)</span>
-                </div>
-                <p className="text-slate-600 text-[11px] leading-relaxed">
-                  محمي بأمر التثبيت الدائم <code className="bg-slate-200 px-1 rounded text-[10px] font-mono">navigator.storage.persist()</code> ليمنع المتصفح نهائياً من مسح أي سجل.
-                </p>
-              </div>
-            </div>
           </div>
 
           {/* Offline & PWA Banner */}

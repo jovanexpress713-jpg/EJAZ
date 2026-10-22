@@ -1,4 +1,5 @@
 <resources>
-    <string name="app_name">إيجاز</string>
-    <string name="app_name_en">Ejaz</string>
+    <string name="app_name">Victoria Logistics ERP</string>
+    <string name="app_name_ar">إيجاز للنقليات</string>
+    <string name="app_name_en">Victoria Logistics ERP</string>
 </resources>

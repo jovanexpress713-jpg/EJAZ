@@ -528,3 +528,16 @@ export function exportDailyHandoverToExcel(
   });
   saveAs(blob, finalFileName);
 }
+
+export function exportToExcel(data: Record<string, any>[], filename: string): void {
+  const ws = XLSX.utils.json_to_sheet(data);
+  ws['!views'] = [{ rightToLeft: true }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'البيانات');
+  const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  const blob = new Blob([wbout], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8'
+  });
+  saveAs(blob, `${filename.endsWith('.xlsx') ? filename : filename + '.xlsx'}`);
+}
+

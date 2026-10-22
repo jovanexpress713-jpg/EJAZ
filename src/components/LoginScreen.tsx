@@ -2,17 +2,19 @@
  * Copyright © فكتوريا لاين سوفت للأنظمة والبرمجة
  * All Rights Reserved.
  * Developed and Programmed by Victoria Line Soft
- * Contact: 771119726
+ * Contact: +967771119726
  */
 
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { Lock, User as UserIcon, Eye, EyeOff, ShieldCheck, ArrowLeft, Truck, Info } from 'lucide-react';
+import { Lock, User as UserIcon, Eye, EyeOff, ShieldCheck, ArrowLeft, Info, Sparkles, Key } from 'lucide-react';
 import { EjazLogo } from './EjazLogo';
 import { StorageService } from '../services/storage';
 import { User, UserRole } from '../types';
 import { SYSTEM_INFO } from '../constants/systemInfo';
 import { AboutSystemModal } from './AboutSystemModal';
+import { ChangePasswordModal } from './ChangePasswordModal';
+import { FirstRunSetupModal } from './FirstRunSetupModal';
 
 interface LoginScreenProps {
   onLoginSuccess?: (user: User) => void;
@@ -26,6 +28,20 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onLogi
   const [errorMsg, setErrorMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
+  
+  // Modals for first-run owner setup and temporary password change
+  const [showFirstRunModal, setShowFirstRunModal] = useState(false);
+  const [userPendingPasswordChange, setUserPendingPasswordChange] = useState<User | null>(null);
+
+  const handleProceedLogin = (matched: User) => {
+    StorageService.setCurrentUser(matched);
+    if (onLoginSuccess) {
+      onLoginSuccess(matched);
+    }
+    if (onLogin) {
+      onLogin(matched);
+    }
+  };
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,7 +51,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onLogi
     setTimeout(() => {
       const users = StorageService.getUsers();
       const matched = users.find(
-        u => u.username.toLowerCase() === username.trim().toLowerCase() && (u.password === password || (!u.password && password === '123456'))
+        u => u.username.toLowerCase() === username.trim().toLowerCase() && 
+             (u.password === password || (!u.password && password === '123456') || (u.password === 'admin' && password === 'admin'))
       );
 
       if (matched) {
@@ -44,15 +61,17 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onLogi
           setIsLoading(false);
           return;
         }
-        StorageService.setCurrentUser(matched);
-        if (onLoginSuccess) {
-          onLoginSuccess(matched);
+
+        // If forced first login password change is required
+        if (matched.mustChangePassword) {
+          setIsLoading(false);
+          setUserPendingPasswordChange(matched);
+          return;
         }
-        if (onLogin) {
-          onLogin(matched);
-        }
+
+        handleProceedLogin(matched);
       } else {
-        setErrorMsg('رمز الدخول أو كلمة المرور غير صحيحة. يرجى المحاولة مجددًا.');
+        setErrorMsg('رمز الدخول أو كلمة المرور غير صحيحة. يرجى التأكد من البيانات أو إعادة التعيين.');
         setIsLoading(false);
       }
     }, 400);
@@ -63,7 +82,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onLogi
     const target = users.find(u => u.role === role);
     if (target) {
       setUsername(target.username);
-      setPassword(target.password || '123456');
+      setPassword(target.password || '123');
       setErrorMsg('');
     }
   };
@@ -71,7 +90,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onLogi
   return (
     <div
       id="ejaz-login-screen"
-      className="min-h-screen w-full flex items-center justify-center bg-slate-900 text-slate-100 p-4 sm:p-6 select-none relative overflow-hidden"
+      className="min-h-screen w-full flex items-center justify-center bg-slate-900 text-slate-100 p-4 sm:p-6 select-none relative overflow-hidden font-cairo"
       dir="rtl"
     >
       {/* Background Decorators */}
@@ -93,8 +112,25 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onLogi
             مؤسسة <span className="text-[#F97316]">إيجـاز</span> للنقليات
           </h2>
           <p className="text-xs text-slate-400 mt-1">
-            بوابة الدخول للنظام الإداري والتشغيلي الموحد
+            بوابة الدخول للنظام الإداري والتشغيلي الموحد (Victoria Logistics ERP)
           </p>
+        </div>
+
+        {/* First Run Owner Setup Banner Button */}
+        <div className="mb-4">
+          <button
+            type="button"
+            onClick={() => setShowFirstRunModal(true)}
+            className="w-full py-2 px-3 bg-gradient-to-r from-orange-600/20 via-amber-600/20 to-blue-600/20 hover:from-orange-600/30 hover:to-blue-600/30 border border-orange-500/40 rounded-xl text-xs font-bold text-orange-300 transition flex items-center justify-between cursor-pointer shadow-xs"
+          >
+            <div className="flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-orange-400" />
+              <span>تهيئة وتخصيص حساب المالك الأول</span>
+            </div>
+            <span className="text-[10px] bg-orange-500/30 px-2 py-0.5 rounded text-orange-200">
+              تأمين الحساب
+            </span>
+          </button>
         </div>
 
         {/* Error Alert */}
@@ -145,7 +181,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onLogi
               />
               <button
                 type="button"
-                id="toggle-password-visibility-btn"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute left-3 top-3 text-slate-400 hover:text-slate-200"
               >
@@ -171,43 +206,59 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onLogi
           </button>
         </form>
 
-        {/* Quick Role Tester Bar */}
+        {/* Quick Role Tester Bar for Enterprise Roles */}
         <div className="mt-6 pt-5 border-t border-slate-700/60">
           <p className="text-[11px] text-slate-400 text-center mb-2.5 font-medium">
-            اختيار حساب تجريبي سريع للاختبار الفوري:
+            اختيار حساب تجريبي سريع لاختبار الأدوار والصلاحيات:
           </p>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-1.5">
             <button
               type="button"
               id="role-select-admin-btn"
               onClick={() => handleQuickRoleSelect('SUPER_ADMIN')}
-              className="px-2.5 py-1.5 bg-slate-900 hover:bg-slate-700/80 rounded-lg text-xs text-orange-300 border border-slate-700 text-center font-medium transition cursor-pointer"
+              className="px-2 py-1.5 bg-slate-900 hover:bg-slate-700/80 rounded-lg text-[11px] text-orange-300 border border-slate-700 text-center font-medium transition cursor-pointer"
             >
               👑 مدير النظام
             </button>
             <button
               type="button"
+              id="role-select-manager-btn"
+              onClick={() => handleQuickRoleSelect('COMPANY_MANAGER')}
+              className="px-2 py-1.5 bg-slate-900 hover:bg-slate-700/80 rounded-lg text-[11px] text-amber-300 border border-slate-700 text-center font-medium transition cursor-pointer"
+            >
+              🏢 مدير الشركة
+            </button>
+            <button
+              type="button"
               id="role-select-ops-btn"
               onClick={() => handleQuickRoleSelect('OPERATIONS')}
-              className="px-2.5 py-1.5 bg-slate-900 hover:bg-slate-700/80 rounded-lg text-xs text-blue-300 border border-slate-700 text-center font-medium transition cursor-pointer"
+              className="px-2 py-1.5 bg-slate-900 hover:bg-slate-700/80 rounded-lg text-[11px] text-blue-300 border border-slate-700 text-center font-medium transition cursor-pointer"
             >
-              🚛 مسؤول العمليات
+              🚛 العمليات
             </button>
             <button
               type="button"
               id="role-select-acc-btn"
               onClick={() => handleQuickRoleSelect('ACCOUNTANT')}
-              className="px-2.5 py-1.5 bg-slate-900 hover:bg-slate-700/80 rounded-lg text-xs text-emerald-300 border border-slate-700 text-center font-medium transition cursor-pointer"
+              className="px-2 py-1.5 bg-slate-900 hover:bg-slate-700/80 rounded-lg text-[11px] text-emerald-300 border border-slate-700 text-center font-medium transition cursor-pointer"
             >
-              💰 المحاسب المالي
+              💰 المحاسب
             </button>
             <button
               type="button"
-              id="role-select-staff-btn"
-              onClick={() => handleQuickRoleSelect('VIEWER')}
-              className="px-2.5 py-1.5 bg-slate-900 hover:bg-slate-700/80 rounded-lg text-xs text-slate-300 border border-slate-700 text-center font-medium transition cursor-pointer"
+              id="role-select-cashier-btn"
+              onClick={() => handleQuickRoleSelect('CASHIER')}
+              className="px-2 py-1.5 bg-slate-900 hover:bg-slate-700/80 rounded-lg text-[11px] text-teal-300 border border-slate-700 text-center font-medium transition cursor-pointer"
             >
-              👁️ مشرف المتابعة
+              🏦 أمين الصندوق
+            </button>
+            <button
+              type="button"
+              id="role-select-auditor-btn"
+              onClick={() => handleQuickRoleSelect('AUDITOR')}
+              className="px-2 py-1.5 bg-slate-900 hover:bg-slate-700/80 rounded-lg text-[11px] text-purple-300 border border-slate-700 text-center font-medium transition cursor-pointer"
+            >
+              📋 المراجع
             </button>
           </div>
         </div>
@@ -243,6 +294,29 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onLogi
           </div>
         </div>
       </motion.div>
+
+      {/* Mandatory Change Password Modal */}
+      {userPendingPasswordChange && (
+        <ChangePasswordModal
+          isOpen={true}
+          currentUser={userPendingPasswordChange}
+          isMandatory={true}
+          onClose={() => setUserPendingPasswordChange(null)}
+          onSuccess={(updated) => {
+            setUserPendingPasswordChange(null);
+            handleProceedLogin(updated);
+          }}
+        />
+      )}
+
+      {/* First Run Master Setup Modal */}
+      <FirstRunSetupModal
+        isOpen={showFirstRunModal}
+        onClose={() => setShowFirstRunModal(false)}
+        onSetupComplete={(owner) => {
+          handleProceedLogin(owner);
+        }}
+      />
 
       {/* About System Modal */}
       <AboutSystemModal 

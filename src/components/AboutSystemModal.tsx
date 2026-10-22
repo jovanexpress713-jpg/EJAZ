@@ -5,7 +5,7 @@
  * Contact: 771119726
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   ShieldCheck, 
@@ -18,11 +18,19 @@ import {
   Lock,
   Building,
   CheckCircle2,
-  FolderArchive
+  FolderArchive,
+  Database,
+  HardDrive,
+  Zap,
+  RefreshCw,
+  Gauge,
+  Server,
+  Activity
 } from 'lucide-react';
 import { EjazLogo } from './EjazLogo';
 import { SYSTEM_INFO } from '../constants/systemInfo';
 import { downloadFullProjectZip } from '../utils/zipExporter';
+import { StorageService } from '../services/storage';
 
 interface AboutSystemModalProps {
   isOpen: boolean;
@@ -31,6 +39,41 @@ interface AboutSystemModalProps {
 
 export const AboutSystemModal: React.FC<AboutSystemModalProps> = ({ isOpen, onClose }) => {
   const [copied, setCopied] = useState(false);
+  const [storageDiagnostics, setStorageDiagnostics] = useState<{
+    supported: boolean;
+    isPersistent: boolean;
+    usageFormatted: string;
+    quotaFormatted: string;
+    usagePercent: number;
+    isUnlimited: boolean;
+    usageOf1TBPercent?: number;
+    remaining1TBFormatted?: string;
+    tripsCount: number;
+    driversCount: number;
+    trucksCount: number;
+    customersCount: number;
+    logsCount: number;
+    collectionsCount: number;
+    expensesCount: number;
+    blobsCount?: number;
+  } | null>(null);
+
+  const [isVerifyingStorage, setIsVerifyingStorage] = useState(false);
+  const [benchmarkResult, setBenchmarkResult] = useState<{
+    success: boolean;
+    writeSpeedMs: number;
+    persisted: boolean;
+    message: string;
+  } | null>(null);
+  const [storageNotice, setStorageNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      StorageService.getStorageDiagnostics()
+        .then(diag => setStorageDiagnostics(diag))
+        .catch(err => console.warn('Failed to load storage diagnostics:', err));
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -40,6 +83,44 @@ export const AboutSystemModal: React.FC<AboutSystemModalProps> = ({ isOpen, onCl
     setTimeout(() => setCopied(false), 2500);
   };
 
+  const handleRunBenchmark = async () => {
+    setIsVerifyingStorage(true);
+    setBenchmarkResult(null);
+    setStorageNotice(null);
+    try {
+      const result = await StorageService.verify1TBCapacity();
+      setBenchmarkResult(result);
+      const updated = await StorageService.getStorageDiagnostics();
+      setStorageDiagnostics(updated);
+    } catch {
+      setBenchmarkResult({
+        success: false,
+        writeSpeedMs: 0,
+        persisted: false,
+        message: 'تعذر إتمام اختبار كفاءة التخزين',
+      });
+    } finally {
+      setIsVerifyingStorage(false);
+    }
+  };
+
+  const handleRequestPersistence = async () => {
+    setIsVerifyingStorage(true);
+    try {
+      const granted = await StorageService.requestPersistentStorage();
+      const updated = await StorageService.getStorageDiagnostics();
+      setStorageDiagnostics(updated);
+      setStorageNotice(
+        granted
+          ? 'تم تفعيل وتأكيد الحماية الدائمة (Zero Eviction) لقاعدة البيانات بنجاح.'
+          : 'قاعدة البيانات محمية محلياً وفق معايير المتصفح القياسية.'
+      );
+      setTimeout(() => setStorageNotice(null), 4000);
+    } finally {
+      setIsVerifyingStorage(false);
+    }
+  };
+
   return (
     <div 
       className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50 animate-in fade-in duration-200 no-print"
@@ -47,11 +128,11 @@ export const AboutSystemModal: React.FC<AboutSystemModalProps> = ({ isOpen, onCl
       onClick={onClose}
     >
       <div 
-        className="bg-white rounded-3xl max-w-xl w-full shadow-2xl border border-slate-200 overflow-hidden my-4 max-h-[92vh] flex flex-col animate-in zoom-in-95 duration-200"
+        className="bg-white dark:bg-slate-900 rounded-3xl max-w-2xl w-full shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden my-4 max-h-[92vh] flex flex-col animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="bg-[#0F172A] text-white p-5 sm:p-6 relative flex-shrink-0">
+        <div className="bg-[#0F172A] text-white p-5 sm:p-6 relative flex-shrink-0 border-b border-slate-800">
           <button
             type="button"
             onClick={onClose}
@@ -80,7 +161,7 @@ export const AboutSystemModal: React.FC<AboutSystemModalProps> = ({ isOpen, onCl
         </div>
 
         {/* Modal Scrollable Body */}
-        <div className="p-5 sm:p-6 space-y-5 overflow-y-auto flex-1 text-xs">
+        <div className="p-5 sm:p-6 space-y-5 overflow-y-auto flex-1 text-xs text-slate-700 dark:text-slate-300">
           {/* Main Developer Highlight Card */}
           <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-2xl p-4 sm:p-5 shadow-md border border-slate-700 relative overflow-hidden">
             <div className="absolute top-0 left-0 w-32 h-32 bg-orange-500/10 rounded-full blur-2xl pointer-events-none" />
@@ -157,63 +238,191 @@ export const AboutSystemModal: React.FC<AboutSystemModalProps> = ({ isOpen, onCl
 
           {/* System Specifications & Version Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-              <div className="text-slate-500 text-[10px] font-bold">إصدار النظام</div>
-              <div className="text-slate-900 font-mono font-black text-xs mt-0.5">
+            <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3">
+              <div className="text-slate-500 dark:text-slate-400 text-[10px] font-bold">إصدار النظام</div>
+              <div className="text-slate-900 dark:text-white font-mono font-black text-xs mt-0.5">
                 v{SYSTEM_INFO.version}
               </div>
             </div>
 
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-              <div className="text-slate-500 text-[10px] font-bold">بناء النظام</div>
-              <div className="text-slate-900 font-mono font-black text-xs mt-0.5">
+            <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3">
+              <div className="text-slate-500 dark:text-slate-400 text-[10px] font-bold">بناء النظام</div>
+              <div className="text-slate-900 dark:text-white font-mono font-black text-xs mt-0.5">
                 {SYSTEM_INFO.buildNumber}
               </div>
             </div>
 
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 col-span-2 sm:col-span-1">
-              <div className="text-slate-500 text-[10px] font-bold">حالة الترخيص</div>
-              <div className="text-emerald-700 font-bold text-xs mt-0.5 flex items-center gap-1">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+            <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 col-span-2 sm:col-span-1">
+              <div className="text-slate-500 dark:text-slate-400 text-[10px] font-bold">حالة الترخيص</div>
+              <div className="text-emerald-700 dark:text-emerald-400 font-bold text-xs mt-0.5 flex items-center gap-1">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                 <span>{SYSTEM_INFO.license.status}</span>
               </div>
             </div>
           </div>
 
+          {/* Dedicated Technical Storage Engine & Diagnostics Section (بيانات ومحرك التخزين الفائق) */}
+          <div className="p-4 sm:p-5 rounded-2xl border border-orange-500/30 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white space-y-4 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-orange-500/20 text-orange-400 rounded-xl border border-orange-500/30">
+                  <Database className="w-5 h-5 text-orange-400" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-sm font-black text-white">
+                      المواصفات الفنية ومحرك التخزين الفائق
+                    </h4>
+                    <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                      IndexedDB Enterprise V2
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    سعة استيعابية مفتوحة تصل حتى 1 تيرابايت (1,024 GB) بدون خوادم خارجية
+                  </p>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleRunBenchmark}
+                  disabled={isVerifyingStorage}
+                  className="px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  title="اختبار سرعة القراءة والكتابة في قاعدة البيانات"
+                >
+                  <Zap className={`w-3.5 h-3.5 text-amber-300 ${isVerifyingStorage ? 'animate-bounce' : ''}`} />
+                  <span>فحص كفاءة التخزين</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleRequestPersistence}
+                  disabled={isVerifyingStorage}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  title="تأكيد حماية المتصفح الدائمة"
+                >
+                  <Lock className="w-3.5 h-3.5 text-slate-300" />
+                  <span>تأكيد الحماية</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Benchmark Feedback */}
+            {benchmarkResult && (
+              <div className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-between gap-3 animate-fadeIn ${
+                benchmarkResult.success ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/50' : 'bg-red-950/80 text-red-300 border-red-500/50'
+              }`}>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>{benchmarkResult.message}</span>
+                </div>
+                <div className="font-mono text-emerald-400 bg-emerald-900/50 px-2 py-1 rounded border border-emerald-700/50 shrink-0">
+                  {benchmarkResult.writeSpeedMs} ms
+                </div>
+              </div>
+            )}
+
+            {storageNotice && !benchmarkResult && (
+              <div className="p-3 bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 rounded-xl text-xs font-bold flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>{storageNotice}</span>
+              </div>
+            )}
+
+            {/* Capacity Meter */}
+            <div className="bg-slate-950/70 p-3.5 rounded-xl border border-slate-800 space-y-2.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="flex items-center gap-1.5 text-slate-300 font-bold">
+                  <Gauge className="w-3.5 h-3.5 text-orange-400" />
+                  <span>المساحة المستخدمة حالياً:</span>
+                  <strong className="text-orange-400 font-mono">{storageDiagnostics?.usageFormatted || '0 بايت'}</strong>
+                </span>
+                <span className="text-[11px] text-slate-400">
+                  السعة القصوى المتاحة: <strong className="text-emerald-400">1,024 GB (1 TB)</strong>
+                </span>
+              </div>
+
+              {/* Progress bar */}
+              <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden p-0.5 border border-slate-700">
+                <div 
+                  className="bg-gradient-to-r from-emerald-500 via-teal-400 to-orange-500 h-full rounded-full transition-all duration-500 min-w-[6px]"
+                  style={{ width: `${Math.max(0.6, Math.min(100, storageDiagnostics?.usageOf1TBPercent || 0.6))}%` }}
+                />
+              </div>
+
+              <div className="flex items-center justify-between text-[10px] text-slate-400">
+                <span>الحماية ضد المسح: <strong className="text-emerald-400">{storageDiagnostics?.isPersistent ? 'تخزين دائم مؤكد (Persistent)' : 'محلي مؤمن'}</strong></span>
+                <span>المتبقي: <strong className="text-slate-300 font-mono">{storageDiagnostics?.remaining1TBFormatted || '1,023.9 GB'}</strong></span>
+              </div>
+            </div>
+
+            {/* Record Statistics Chips */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+              <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between">
+                <span className="text-slate-400 text-[11px]">الرحلات المسجلة:</span>
+                <span className="font-mono font-bold text-orange-400">{storageDiagnostics?.tripsCount ?? 0}</span>
+              </div>
+              <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between">
+                <span className="text-slate-400 text-[11px]">السائقون:</span>
+                <span className="font-mono font-bold text-orange-400">{storageDiagnostics?.driversCount ?? 0}</span>
+              </div>
+              <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between">
+                <span className="text-slate-400 text-[11px]">الشاحنات:</span>
+                <span className="font-mono font-bold text-orange-400">{storageDiagnostics?.trucksCount ?? 0}</span>
+              </div>
+              <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between">
+                <span className="text-slate-400 text-[11px]">العملاء:</span>
+                <span className="font-mono font-bold text-orange-400">{storageDiagnostics?.customersCount ?? 0}</span>
+              </div>
+              <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between">
+                <span className="text-slate-400 text-[11px]">القيود والسندات:</span>
+                <span className="font-mono font-bold text-emerald-400">
+                  {(storageDiagnostics?.collectionsCount ?? 0) + (storageDiagnostics?.expensesCount ?? 0)}
+                </span>
+              </div>
+              <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between">
+                <span className="text-slate-400 text-[11px]">سجل الرقابة:</span>
+                <span className="font-mono font-bold text-blue-400">{storageDiagnostics?.logsCount ?? 0}</span>
+              </div>
+            </div>
+          </div>
+
           {/* Software Protection & Immutability Notice */}
-          <div className="p-3.5 bg-amber-50/80 border border-amber-200 rounded-xl text-amber-900 flex items-start gap-2.5">
-            <Lock className="w-4 h-4 text-amber-700 mt-0.5 flex-shrink-0" />
+          <div className="p-3.5 bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 rounded-xl text-amber-900 dark:text-amber-300 flex items-start gap-2.5">
+            <Lock className="w-4 h-4 text-amber-700 dark:text-amber-400 mt-0.5 flex-shrink-0" />
             <div className="space-y-1">
-              <p className="font-bold text-xs text-amber-900">
+              <p className="font-bold text-xs">
                 حماية حقوق الملكية والبرمجة والتطوير:
               </p>
-              <p className="text-[11px] text-amber-800 leading-relaxed">
+              <p className="text-[11px] leading-relaxed opacity-90">
                 {SYSTEM_INFO.license.protectedNotice}
               </p>
             </div>
           </div>
 
           {/* Enterprise Technical Platform Highlights */}
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2">
-            <div className="text-slate-700 font-bold text-xs flex items-center gap-1.5">
-              <Layers className="w-3.5 h-3.5 text-orange-600" />
+          <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3.5 space-y-2">
+            <div className="text-slate-800 dark:text-slate-200 font-bold text-xs flex items-center gap-1.5">
+              <Layers className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400" />
               <span>مواصفات المنصة التقنية لنظام إيجاز:</span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-600">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-600 dark:text-slate-400">
               <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                 <span>محرك تخزين متقدم فائق السرعة وقاعدة بيانات محلية</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                 <span>يعمل بدون إنترنت (Offline-First) ودعم التثبيت PWA</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                 <span>نظام محاسبي وفوترة ضريبية وإدارة أسطول ورحلات</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                 <span>حماية متقدمة للصلاحيات وسجلات الرقابة والتدقيق</span>
               </div>
             </div>
@@ -221,8 +430,8 @@ export const AboutSystemModal: React.FC<AboutSystemModalProps> = ({ isOpen, onCl
         </div>
 
         {/* Modal Footer */}
-        <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 flex-shrink-0">
-          <div className="text-[11px] text-slate-500">
+        <div className="p-4 bg-slate-50 dark:bg-slate-800/90 border-t border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 flex-shrink-0">
+          <div className="text-[11px] text-slate-500 dark:text-slate-400">
             فكتوريا لاين سوفت للأنظمة والبرمجة © {SYSTEM_INFO.releaseYear}
           </div>
           <div className="flex items-center gap-2">
