@@ -44,9 +44,9 @@
                 android:layout_width="230dp"
                 android:layout_height="230dp"
                 android:adjustViewBounds="true"
-                android:contentDescription="EJAZ"
+                android:contentDescription="VICTORIA Logistics ERP"
                 android:scaleType="fitCenter"
-                android:src="@mipmap/ic_launcher" />
+                android:src="@drawable/ic_ejaz_launcher" />
 
             <View
                 android:id="@+id/launchGoldLine"
