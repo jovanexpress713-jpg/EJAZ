@@ -126,38 +126,34 @@ export const AdminMonitorView: React.FC<AdminMonitorViewProps> = ({
     onRefreshData();
   };
 
-  // Trigger manual sync or simulated peer exchange
-  const handleTriggerSync = () => {
+  // Trigger manual sync with Central Server
+  const handleTriggerSync = async () => {
     setIsSyncing(true);
-    setSyncFeedback({ message: 'جاري الاتصال والتحقق من قائمة الانتظار وبصمة البيانات...', type: 'info' });
+    setSyncFeedback({ message: 'جاري الاتصال بالقاعدة المركزية ومزامنة العمليات...', type: 'info' });
 
-    setTimeout(() => {
-      try {
-        const outbox = SyncEngine.getOutbox();
-        const pending = outbox.filter(i => i.status === 'PENDING');
-        
-        // Mark pending items as synced
-        pending.forEach(item => {
-          SyncEngine.markSynced(item.id);
-        });
+    try {
+      const syncResult = await SyncEngine.syncWithServer(currentUser);
+      setIsSyncing(false);
 
-        // Register current device activity
-        SyncEngine.registerCurrentDevice(currentUser);
-
-        setIsSyncing(false);
+      if (syncResult.success) {
         setSyncFeedback({ 
-          message: `تمت المزامنة بنجاح! تم ترحيل وتأكيد ${pending.length} عملية مع تحديث بصمة الأجهزة.`, 
+          message: `تمت المزامنة بنجاح! تم إرسال ${syncResult.pushedCount} عملية واستقبال التحديثات من الخادم المركزي.`, 
           type: 'success' 
         });
         onRefreshData();
-      } catch (err: any) {
-        setIsSyncing(false);
+      } else {
         setSyncFeedback({ 
-          message: `تعذر إتمام المزامنة: ${err?.message || 'خطأ غير متوقع'}`, 
+          message: syncResult.error || 'تعذر الاتصال بالخادم المركزي، التطبيق يعمل في وضع أوفلاين والبيانات محفوظة.', 
           type: 'error' 
         });
       }
-    }, 1200);
+    } catch (err: any) {
+      setIsSyncing(false);
+      setSyncFeedback({ 
+        message: `تعذر إتمام المزامنة: ${err?.message || 'خطأ غير متوقع'}`, 
+        type: 'error' 
+      });
+    }
   };
 
   // Export encrypted bundle for physical/offline handover

@@ -526,6 +526,8 @@ export class StorageService {
     if (user) {
       this.addAuditLog(user, 'UPDATE_SETTINGS', 'Settings', 'COMPANY', 'تحديث بيانات وهوية المؤسسة الإدارية');
     }
+    SyncEngine.enqueueOperation('SETTINGS', 'company_settings', 'UPDATE', settings, user);
+    SyncEngine.syncWithServer(user).catch(() => {});
   }
 
   static saveSettings(settings: CompanySettings, user?: User): void {
@@ -745,6 +747,8 @@ export class StorageService {
         `${isNew ? 'إضافة عميل جديد' : 'تعديل بيانات عميل'}: ${customer.name}`
       );
     }
+    SyncEngine.enqueueOperation('CUSTOMER', customer.id, isNew ? 'CREATE' : 'UPDATE', customer, actor);
+    SyncEngine.syncWithServer(actor).catch(() => {});
   }
 
   static deleteCustomer(id: string, actor?: User): void {
@@ -753,6 +757,8 @@ export class StorageService {
     if (actor) {
       this.addAuditLog(actor, 'DELETE_CUSTOMER', 'Customer', id, `حذف العميل معرف ${id}`);
     }
+    SyncEngine.enqueueOperation('CUSTOMER', id, 'DELETE', { id }, actor);
+    SyncEngine.syncWithServer(actor).catch(() => {});
   }
 
   // Drivers
@@ -816,6 +822,8 @@ export class StorageService {
         `${isNew ? 'إضافة سائق جديد' : 'تعديل بيانات سائق'}: ${driver.name}`
       );
     }
+    SyncEngine.enqueueOperation('DRIVER', driver.id, isNew ? 'CREATE' : 'UPDATE', driver, actor);
+    SyncEngine.syncWithServer(actor).catch(() => {});
   }
 
   // Save batch of drivers (supports 5,000+ drivers instantaneously via high-capacity engine)
@@ -826,6 +834,7 @@ export class StorageService {
     
     for (const d of newDrivers) {
       existingMap.set(d.id, d);
+      SyncEngine.enqueueOperation('DRIVER', d.id, 'CREATE', d, actor);
     }
     const merged = Array.from(existingMap.values());
     setItem(STORAGE_KEYS.DRIVERS, merged);
@@ -839,6 +848,7 @@ export class StorageService {
         `إضافة دفعة مجمعة من السائقين (${newDrivers.length} سائق) ليصبح الإجمالي ${merged.length} سائق`
       );
     }
+    SyncEngine.syncWithServer(actor).catch(() => {});
   }
 
   static deleteDriver(id: string, actor?: User): void {
@@ -863,6 +873,8 @@ export class StorageService {
     if (actor) {
       this.addAuditLog(actor, 'DELETE_DRIVER', 'Driver', id, `حذف السائق معرف ${id}`);
     }
+    SyncEngine.enqueueOperation('DRIVER', id, 'DELETE', { id }, actor);
+    SyncEngine.syncWithServer(actor).catch(() => {});
   }
 
   // Trucks
@@ -949,6 +961,8 @@ export class StorageService {
         `${isNew ? 'إضافة شاحنة جديدة' : 'تعديل بيانات شاحنة'}: ${truck.plateNumber} (${truck.model})`
       );
     }
+    SyncEngine.enqueueOperation('TRUCK', truck.id, isNew ? 'CREATE' : 'UPDATE', truck, actor);
+    SyncEngine.syncWithServer(actor).catch(() => {});
   }
 
   // Save batch of trucks (supports 5,000+ trucks instantaneously via high-capacity engine)
@@ -959,6 +973,7 @@ export class StorageService {
     
     for (const t of newTrucks) {
       existingMap.set(t.id, t);
+      SyncEngine.enqueueOperation('TRUCK', t.id, 'CREATE', t, actor);
     }
     const merged = Array.from(existingMap.values());
     setItem(STORAGE_KEYS.TRUCKS, merged);
@@ -972,6 +987,7 @@ export class StorageService {
         `إضافة دفعة مجمعة من الشاحنات (${newTrucks.length} شاحنة) ليصبح الإجمالي ${merged.length} شاحنة`
       );
     }
+    SyncEngine.syncWithServer(actor).catch(() => {});
   }
 
   // Switch or assign/unassign a driver to a truck directly
@@ -1080,6 +1096,8 @@ export class StorageService {
     if (actor) {
       this.addAuditLog(actor, 'DELETE_TRUCK', 'Truck', id, `حذف الشاحنة معرف ${id}`);
     }
+    SyncEngine.enqueueOperation('TRUCK', id, 'DELETE', { id }, actor);
+    SyncEngine.syncWithServer(actor).catch(() => {});
   }
 
   // Bind Driver and Truck Permanently
@@ -1865,6 +1883,8 @@ export class StorageService {
         `${isNew ? 'إضافة رحلة جديدة' : 'تحديث رحلة'}: ${trip.tripNumber} (${trip.customerName} - ${trip.loadingLocation} إلى ${trip.unloadingLocation})`
       );
     }
+    SyncEngine.enqueueOperation('TRIP', tripWithFrozenValues.id, isNew ? 'CREATE' : 'UPDATE', tripWithFrozenValues, actor);
+    SyncEngine.syncWithServer(actor).catch(() => {});
   }
 
   static deleteTrip(id: string, actor?: User): void {
@@ -1875,6 +1895,8 @@ export class StorageService {
     if (actor && target) {
       this.addAuditLog(actor, 'DELETE_TRIP', 'Trip', target.tripNumber, `حذف الرحلة رقم ${target.tripNumber}`);
     }
+    SyncEngine.enqueueOperation('TRIP', id, 'DELETE', { id }, actor);
+    SyncEngine.syncWithServer(actor).catch(() => {});
   }
 
   static deleteTrips(ids: string[], actor?: User): void {
@@ -1927,6 +1949,8 @@ export class StorageService {
         `${isNew ? 'تسجيل صيانة' : 'تحديث صيانة'} للشاحنة ${record.plateNumber} بقيمة ${record.amount} ر.س`
       );
     }
+    SyncEngine.enqueueOperation('MAINTENANCE', record.id, isNew ? 'CREATE' : 'UPDATE', record, actor);
+    SyncEngine.syncWithServer(actor).catch(() => {});
   }
 
   // Collections
@@ -1969,6 +1993,8 @@ export class StorageService {
         `${isNew ? 'سند قبض / تحصيل' : 'تعديل سند قبض'} بقيمة ${col.amount} ر.س من العميل ${col.customerName}`
       );
     }
+    SyncEngine.enqueueOperation('COLLECTION', col.id, isNew ? 'CREATE' : 'UPDATE', col, actor);
+    SyncEngine.syncWithServer(actor).catch(() => {});
   }
 
   static deleteCollection(id: string, actor?: User): void {
@@ -2000,6 +2026,8 @@ export class StorageService {
         `حذف سند القبض رقم ${target.id} بقيمة ${target.amount} ر.س للعميل ${target.customerName}`
       );
     }
+    SyncEngine.enqueueOperation('COLLECTION', id, 'DELETE', { id }, actor);
+    SyncEngine.syncWithServer(actor).catch(() => {});
   }
 
   // Expenses
@@ -2027,6 +2055,8 @@ export class StorageService {
         `${isNew ? 'سند صرف / مصروف' : 'تعديل سند صرف'} بقيمة ${exp.amount} ر.س (${exp.description})`
       );
     }
+    SyncEngine.enqueueOperation('EXPENSE', exp.id, isNew ? 'CREATE' : 'UPDATE', exp, actor);
+    SyncEngine.syncWithServer(actor).catch(() => {});
   }
 
   static deleteExpense(id: string, actor?: User): void {
@@ -2044,6 +2074,8 @@ export class StorageService {
         `حذف سند الصرف رقم ${target.id} بقيمة ${target.amount} ر.س (${target.description})`
       );
     }
+    SyncEngine.enqueueOperation('EXPENSE', id, 'DELETE', { id }, actor);
+    SyncEngine.syncWithServer(actor).catch(() => {});
   }
 
   // Notifications
@@ -2579,6 +2611,123 @@ export class StorageService {
       netCashToDeliver,
       trips,
     };
+  }
+
+  private static syncListeners: Array<() => void> = [];
+
+  static onSyncUpdate(callback: () => void): () => void {
+    this.syncListeners.push(callback);
+    return () => {
+      this.syncListeners = this.syncListeners.filter(cb => cb !== callback);
+    };
+  }
+
+  static notifySyncUpdate(): void {
+    this.syncListeners.forEach(cb => {
+      try { cb(); } catch (e) { console.error('Sync listener error:', e); }
+    });
+  }
+
+  /**
+   * Apply remote data fetched from central server into local storage
+   */
+  static applyRemoteData(remoteData: any): number {
+    if (!remoteData) return 0;
+    let updatedCount = 0;
+
+    if (Array.isArray(remoteData.trips)) {
+      const localTrips = this.getTrips();
+      const tripMap = new Map(localTrips.map(t => [t.id, t]));
+      remoteData.trips.forEach((rTrip: Trip) => {
+        tripMap.set(rTrip.id, rTrip);
+        updatedCount++;
+      });
+      setItem(STORAGE_KEYS.TRIPS, Array.from(tripMap.values()));
+    }
+
+    if (Array.isArray(remoteData.customers)) {
+      const local = this.getCustomers();
+      const map = new Map(local.map(c => [c.id, c]));
+      remoteData.customers.forEach((rCust: Customer) => {
+        map.set(rCust.id, rCust);
+        updatedCount++;
+      });
+      setItem(STORAGE_KEYS.CUSTOMERS, Array.from(map.values()));
+    }
+
+    if (Array.isArray(remoteData.drivers)) {
+      const local = this.getDrivers();
+      const map = new Map(local.map(d => [d.id, d]));
+      remoteData.drivers.forEach((rDrv: Driver) => {
+        map.set(rDrv.id, rDrv);
+        updatedCount++;
+      });
+      setItem(STORAGE_KEYS.DRIVERS, Array.from(map.values()));
+    }
+
+    if (Array.isArray(remoteData.trucks)) {
+      const local = this.getTrucks();
+      const map = new Map(local.map(t => [t.id, t]));
+      remoteData.trucks.forEach((rTrk: Truck) => {
+        map.set(rTrk.id, rTrk);
+        updatedCount++;
+      });
+      setItem(STORAGE_KEYS.TRUCKS, Array.from(map.values()));
+    }
+
+    if (Array.isArray(remoteData.collections)) {
+      const local = this.getCollections();
+      const map = new Map(local.map(c => [c.id, c]));
+      remoteData.collections.forEach((rCol: CollectionRecord) => {
+        map.set(rCol.id, rCol);
+        updatedCount++;
+      });
+      setItem(STORAGE_KEYS.COLLECTIONS, Array.from(map.values()));
+    }
+
+    if (Array.isArray(remoteData.expenses)) {
+      const local = this.getExpenses();
+      const map = new Map(local.map(e => [e.id, e]));
+      remoteData.expenses.forEach((rExp: ExpenseRecord) => {
+        map.set(rExp.id, rExp);
+        updatedCount++;
+      });
+      setItem(STORAGE_KEYS.EXPENSES, Array.from(map.values()));
+    }
+
+    if (Array.isArray(remoteData.maintenance)) {
+      const local = this.getMaintenance();
+      const map = new Map(local.map(m => [m.id, m]));
+      remoteData.maintenance.forEach((rM: MaintenanceRecord) => {
+        map.set(rM.id, rM);
+        updatedCount++;
+      });
+      setItem(STORAGE_KEYS.MAINTENANCE, Array.from(map.values()));
+    }
+
+    if (Array.isArray(remoteData.users) && remoteData.users.length > 0) {
+      const localUsers = this.getUsers();
+      const userMap = new Map(localUsers.map(u => [u.id, u]));
+      remoteData.users.forEach((rUser: User) => {
+        const existing = userMap.get(rUser.id);
+        userMap.set(rUser.id, { ...existing, ...rUser });
+      });
+      setItem(STORAGE_KEYS.USERS, Array.from(userMap.values()));
+    }
+
+    if (remoteData.settings) {
+      const currentSettings = this.getSettings();
+      setItem(STORAGE_KEYS.SETTINGS, { ...currentSettings, ...remoteData.settings });
+    }
+
+    // Keep strict 1-to-1 driver to truck binding intact
+    this.enforceStrictOneDriverOneTruckBinding();
+
+    if (updatedCount > 0) {
+      this.notifySyncUpdate();
+    }
+
+    return updatedCount;
   }
 
   static resetToDefault(actor?: User): void {

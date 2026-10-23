@@ -10,6 +10,7 @@ import { ShieldCheck, User as UserIcon, Phone, Key, Lock, Copy, Check, Sparkles,
 import { User } from '../types';
 import { StorageService, getDefaultPermissions } from '../services/storage';
 import { generateRecoveryKey, generateSalt } from '../services/security';
+import { ApiClient } from '../services/apiClient';
 
 interface FirstRunSetupModalProps {
   isOpen: boolean;
@@ -89,6 +90,14 @@ export const FirstRunSetupModal: React.FC<FirstRunSetupModalProps> = ({
 
       StorageService.saveUser(owner);
       StorageService.setCurrentUser(owner);
+
+      // Also sync to central server if online
+      ApiClient.setupOwner({
+        fullName: fullName.trim(),
+        username: username.trim().toLowerCase(),
+        phone: phone.trim(),
+        password: password,
+      }).catch(err => console.warn('Server owner sync note:', err));
 
       // Also update settings owner phone
       const settings = StorageService.getSettings();

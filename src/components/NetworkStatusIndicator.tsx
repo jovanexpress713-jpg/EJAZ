@@ -14,6 +14,8 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { StorageService } from '../services/storage';
+import { SyncEngine } from '../services/syncEngine';
+import { ApiClient } from '../services/apiClient';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -36,6 +38,27 @@ export const NetworkStatusIndicator: React.FC = () => {
   const [isAndroid, setIsAndroid] = useState<boolean>(false);
   const [isInIframe, setIsInIframe] = useState<boolean>(false);
   const [showInstallGuide, setShowInstallGuide] = useState<boolean>(false);
+
+  // Manual Sync State
+  const [isManualSyncing, setIsManualSyncing] = useState<boolean>(false);
+  const [manualSyncMsg, setManualSyncMsg] = useState<string | null>(null);
+
+  const handleManualSync = async () => {
+    setIsManualSyncing(true);
+    setManualSyncMsg(null);
+    try {
+      const res = await SyncEngine.syncWithServer();
+      if (res.success) {
+        setManualSyncMsg(`تمت المزامنة بنجاح! تم إرسال ${res.pushedCount} عملية وتحديث السجلات المركزية.`);
+      } else {
+        setManualSyncMsg(res.error || 'فشلت المزامنة مع الخادم');
+      }
+    } catch (e: any) {
+      setManualSyncMsg(e?.message || 'خطأ في المزامنة');
+    } finally {
+      setIsManualSyncing(false);
+    }
+  };
 
   useEffect(() => {
     // Check if running inside an iframe (like AI Studio preview)
@@ -114,25 +137,32 @@ export const NetworkStatusIndicator: React.FC = () => {
   const customersCount = StorageService.getCustomers().length;
   const trucksCount = StorageService.getTrucks().length;
   const driversCount = StorageService.getDrivers().length;
+  const pendingCount = SyncEngine.getOutbox().filter(i => i.status === 'PENDING').length;
 
   return (
     <>
-      {/* Network Status Capsule (Hidden when online, only shown if offline) */}
-      {!isOnline && (
-        <div className="flex items-center gap-1.5">
-          {/* Status Pill Button (Offline warning only) */}
-          <button
-            type="button"
-            onClick={() => setShowStatusModal(true)}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold transition border cursor-pointer bg-amber-950/80 text-amber-300 border-amber-700 hover:bg-amber-900/80 animate-pulse"
-            title="يعمل بدون إنترنت (Offline Mode)"
-          >
-            <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
-            <WifiOff className="w-3.5 h-3.5 text-amber-400" />
-            <span>أوفلاين (شغال)</span>
-          </button>
-        </div>
-      )}
+      {/* Network & Central Sync Capsule */}
+      <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => setShowStatusModal(true)}
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold transition border cursor-pointer ${
+            isOnline 
+              ? 'bg-slate-800/90 text-emerald-400 border-slate-700 hover:bg-slate-700/90' 
+              : 'bg-amber-950/80 text-amber-300 border-amber-700 hover:bg-amber-900/80 animate-pulse'
+          }`}
+          title={isOnline ? 'متصل بالخادم المركزي وقاعدة البيانات' : 'يعمل بدون إنترنت (Offline Mode)'}
+        >
+          <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-400' : 'bg-amber-400 animate-ping'}`} />
+          {isOnline ? <Wifi className="w-3.5 h-3.5 text-emerald-400" /> : <WifiOff className="w-3.5 h-3.5 text-amber-400" />}
+          <span>{isOnline ? 'الخادم المركزي' : 'أوفلاين (شغال)'}</span>
+          {pendingCount > 0 && (
+            <span className="px-1.5 py-0.2 bg-amber-500 text-slate-900 rounded-full text-[9px] font-black">
+              {pendingCount}
+            </span>
+          )}
+        </button>
+      </div>
 
       {/* Floating Network Transition Toast */}
       {showToast && (
@@ -223,6 +253,36 @@ export const NetworkStatusIndicator: React.FC = () => {
                       : 'يمكنك الاستمرار في إنشاء الرحلات، تسجيل المصروفات وسندات القبض. يتم حفظ كل شيء بأمان على متصفحك وسيعمل التطبيق بدون أي انقطاع.'}
                   </p>
                 </div>
+              </div>
+
+              {/* Central Database Sync Box */}
+              <div className="bg-slate-900 text-white p-4 rounded-xl border border-slate-700 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+                    <span className="font-bold text-xs">قاعدة البيانات والمزامنة المركزية</span>
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    {pendingCount > 0 ? `${pendingCount} عملية بانتظار الإرسال` : 'جميع العمليات متزامنة'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  يتم ترحيل ومزامنة الرحلات وسندات القبض والمصروفات تلقائياً مع الخادم المركزي، ويمكن للمدير والمالك متابعة جميع السجلات من أي جهاز في نفس اللحظة.
+                </p>
+                {manualSyncMsg && (
+                  <div className="text-[11px] p-2 rounded-lg bg-slate-800 text-amber-300 border border-slate-700">
+                    {manualSyncMsg}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={handleManualSync}
+                  disabled={isManualSyncing}
+                  className="w-full bg-[#F97316] hover:bg-orange-600 disabled:opacity-50 text-white font-bold text-xs py-2 px-3 rounded-lg flex items-center justify-center gap-2 cursor-pointer transition shadow-sm"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isManualSyncing ? 'animate-spin' : ''}`} />
+                  <span>{isManualSyncing ? 'جاري المزامنة مع الخادم...' : 'مزامنة فورية الآن مع الخادم المركزي'}</span>
+                </button>
               </div>
 
               {/* Local Storage Stats */}

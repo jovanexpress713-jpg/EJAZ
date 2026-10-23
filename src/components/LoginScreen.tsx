@@ -10,6 +10,8 @@ import { motion } from 'motion/react';
 import { Lock, User as UserIcon, Eye, EyeOff, ShieldCheck, ArrowLeft, Info, Sparkles, Key } from 'lucide-react';
 import { EjazLogo } from './EjazLogo';
 import { StorageService } from '../services/storage';
+import { SyncEngine } from '../services/syncEngine';
+import { ApiClient } from '../services/apiClient';
 import { User, UserRole } from '../types';
 import { SYSTEM_INFO } from '../constants/systemInfo';
 import { AboutSystemModal } from './AboutSystemModal';
@@ -43,12 +45,35 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onLogi
     }
   };
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
     setIsLoading(true);
 
-    setTimeout(() => {
+    try {
+      // 1. Attempt online server authentication first
+      const isOnline = await ApiClient.isOnline();
+      if (isOnline) {
+        try {
+          const authRes = await ApiClient.login(username.trim(), password);
+          if (authRes && authRes.user) {
+            // Trigger background sync to pull latest data for this authenticated session
+            SyncEngine.syncWithServer(authRes.user).catch(() => {});
+            setIsLoading(false);
+            handleProceedLogin(authRes.user);
+            return;
+          }
+        } catch (serverErr: any) {
+          // If server explicitly returned invalid credentials or deactivated account, show message
+          if (serverErr.message && !serverErr.message.includes('Failed to fetch')) {
+            setErrorMsg(serverErr.message);
+            setIsLoading(false);
+            return;
+          }
+        }
+      }
+
+      // 2. Fallback to local authentication when offline
       const users = StorageService.getUsers();
       const matched = users.find(
         u => u.username.toLowerCase() === username.trim().toLowerCase() && 
@@ -62,19 +87,22 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onLogi
           return;
         }
 
-        // If forced first login password change is required
         if (matched.mustChangePassword) {
           setIsLoading(false);
           setUserPendingPasswordChange(matched);
           return;
         }
 
+        setIsLoading(false);
         handleProceedLogin(matched);
       } else {
-        setErrorMsg('رمز الدخول أو كلمة المرور غير صحيحة. يرجى التأكد من البيانات أو إعادة التعيين.');
+        setErrorMsg('اسم المستخدم أو كلمة المرور غير صحيحة. يرجى التحقق من البيانات.');
         setIsLoading(false);
       }
-    }, 400);
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'حدث خطأ أثناء تسجيل الدخول');
+      setIsLoading(false);
+    }
   };
 
   const handleQuickRoleSelect = (role: UserRole) => {

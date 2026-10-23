@@ -16,6 +16,7 @@
  */
 
 import { SyncConfig, SyncOutboxItem, SyncDevice, ConflictRecord, User } from '../types';
+import { ApiClient } from './apiClient';
 
 const SYNC_OUTBOX_KEY = 'victoria_sync_outbox_v1';
 const SYNC_DEVICES_KEY = 'victoria_sync_devices_v1';
@@ -312,4 +313,67 @@ export class SyncEngine {
       return { success: false, error: 'تعذر فك تشفير حزمة المزامنة: ' + (e?.message || 'خطأ في التشفير') };
     }
   }
+
+  /**
+   * Enterprise Central Server Two-Way Sync:
+   * 1. Check network connectivity to central server
+   * 2. Push all queued outbox operations
+   * 3. Pull newest changes and update local state
+   */
+  public static async syncWithServer(currentUser?: User | null): Promise<{
+    success: boolean;
+    pushedCount: number;
+    pulledCount: number;
+    error?: string;
+  }> {
+    try {
+      const isOnline = await ApiClient.isOnline();
+      if (!isOnline) {
+        return { success: false, pushedCount: 0, pulledCount: 0, error: 'غير متصل بالخادم المركزي' };
+      }
+
+      this.registerCurrentDevice(currentUser);
+      const outbox = this.getOutbox();
+      const pendingItems = outbox.filter(item => item.status === 'PENDING' || (item.status === 'FAILED' && (item.retryCount || 0) < 5));
+
+      let pushedCount = 0;
+      if (pendingItems.length > 0) {
+        try {
+          const pushRes = await ApiClient.syncPush(
+            pendingItems,
+            this.getDeviceId(),
+            this.getDeviceName()
+          );
+          if (pushRes && Array.isArray(pushRes.appliedIds)) {
+            pushRes.appliedIds.forEach(id => this.markSynced(id));
+            pushedCount = pushRes.appliedIds.length;
+          }
+        } catch (pushErr: any) {
+          console.warn('Sync push error:', pushErr);
+          pendingItems.forEach(item => this.markFailed(item.id, pushErr?.message || 'خطأ في إرسال العملية'));
+        }
+      }
+
+      // Pull updates from central server
+      let pulledCount = 0;
+      try {
+        const pullRes = await ApiClient.syncPull();
+        if (pullRes && pullRes.data) {
+          const { StorageService } = await import('./storage');
+          pulledCount = StorageService.applyRemoteData(pullRes.data);
+        }
+      } catch (pullErr: any) {
+        console.warn('Sync pull error:', pullErr);
+      }
+
+      // Clean up synced operations older than 24h
+      this.purgeSyncedItems();
+
+      return { success: true, pushedCount, pulledCount };
+    } catch (err: any) {
+      console.warn('Sync failed:', err);
+      return { success: false, pushedCount: 0, pulledCount: 0, error: err?.message || 'فشلت المزامنة' };
+    }
+  }
 }
+

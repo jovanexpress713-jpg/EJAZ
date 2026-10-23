@@ -20,6 +20,7 @@ import {
   AppNotification 
 } from './types';
 import { StorageService } from './services/storage';
+import { SyncEngine } from './services/syncEngine';
 import { SplashScreen } from './components/SplashScreen';
 import { LoginScreen } from './components/LoginScreen';
 import { Header, NavigationTabs } from './components/Header';
@@ -129,6 +130,23 @@ export default function App() {
       }
     });
 
+    // Subscribe to real-time central server sync updates
+    const unsubscribeSync = StorageService.onSyncUpdate(() => {
+      refreshData();
+    });
+
+    // Automatic background multi-device synchronization cycle (every 10 seconds)
+    const runBackgroundSync = () => {
+      SyncEngine.syncWithServer(StorageService.getCurrentUser()).catch(() => {});
+    };
+    runBackgroundSync();
+    const syncInterval = setInterval(runBackgroundSync, 10000);
+
+    const handleWindowOnline = () => {
+      runBackgroundSync();
+    };
+    window.addEventListener('online', handleWindowOnline);
+
     // Check URL query parameters for direct trip link
     if (typeof window !== 'undefined') {
       try {
@@ -149,6 +167,9 @@ export default function App() {
 
     return () => {
       unsubscribe();
+      unsubscribeSync();
+      clearInterval(syncInterval);
+      window.removeEventListener('online', handleWindowOnline);
     };
   }, [refreshData]);
 

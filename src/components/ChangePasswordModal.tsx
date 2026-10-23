@@ -9,6 +9,7 @@ import React, { useState } from 'react';
 import { Lock, Eye, EyeOff, ShieldCheck, CheckCircle2, AlertCircle, X } from 'lucide-react';
 import { User } from '../types';
 import { StorageService } from '../services/storage';
+import { ApiClient } from '../services/apiClient';
 
 interface ChangePasswordModalProps {
   isOpen: boolean;
@@ -57,6 +58,11 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
 
     try {
       StorageService.changeUserPassword(currentUser.id, newPassword);
+
+      // Also call server API if online
+      ApiClient.changePassword(currentPassword || currentUser.password || '', newPassword)
+        .catch(err => console.warn('Server password sync note:', err));
+
       setSuccessMsg('تم تحديث كلمة المرور وتأمين حسابك بنجاح!');
       const updatedUser: User = {
         ...currentUser,
