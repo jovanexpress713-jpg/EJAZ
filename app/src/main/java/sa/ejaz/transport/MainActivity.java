@@ -1,13 +1,18 @@
 package sa.ejaz.transport;
 
 import android.Manifest;
+import android.animation.AnimatorSet;
+import android.animation.ObjectAnimator;
 import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.View;
+import android.view.animation.AccelerateDecelerateInterpolator;
 import android.webkit.ConsoleMessage;
 import android.webkit.GeolocationPermissions;
 import android.webkit.PermissionRequest;
@@ -17,6 +22,7 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.ImageView;
 import android.widget.ProgressBar;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
@@ -27,9 +33,16 @@ public class MainActivity extends AppCompatActivity {
 
     private WebView webView;
     private ProgressBar progressBar;
+    private View launchOverlay;
+    private ImageView launchLogo;
+    private View launchGoldLine;
     private ValueCallback<Uri[]> filePathCallback;
     private static final int FILE_CHOOSER_REQUEST_CODE = 1001;
     private static final int PERMISSION_REQUEST_CODE = 1002;
+    private final Handler launchHandler = new Handler(Looper.getMainLooper());
+    private boolean pageReady = false;
+    private boolean minimumLaunchTimeReached = false;
+    private boolean launchDismissed = false;
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -39,8 +52,11 @@ public class MainActivity extends AppCompatActivity {
 
         webView = findViewById(R.id.webView);
         progressBar = findViewById(R.id.progressBar);
+        launchOverlay = findViewById(R.id.launchOverlay);
+        launchLogo = findViewById(R.id.launchLogo);
+        launchGoldLine = findViewById(R.id.launchGoldLine);
 
-        // Request runtime permissions for camera & media access
+        startPremiumLaunchAnimation();
         checkAndRequestPermissions();
 
         WebSettings settings = webView.getSettings();
@@ -60,7 +76,6 @@ public class MainActivity extends AppCompatActivity {
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
         settings.setGeolocationEnabled(true);
 
-        // Set persistent database path for HTML5 storage/IndexedDB
         try {
             String dbPath = getApplicationContext().getDir("databases", 0).getPath();
             settings.setDatabasePath(dbPath);
@@ -72,12 +87,10 @@ public class MainActivity extends AppCompatActivity {
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 String url = request.getUrl().toString();
 
-                // Keep local app assets within WebView
                 if (url.startsWith("file:///android_asset/")) {
                     return false;
                 }
 
-                // Handle system intent URLs (WhatsApp, Phone call, Email)
                 if (url.startsWith("tel:") || url.startsWith("mailto:") || url.startsWith("whatsapp:") || url.startsWith("intent:")) {
                     try {
                         Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
@@ -88,7 +101,6 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
 
-                // External web links (open in system browser)
                 if (url.startsWith("http://") || url.startsWith("https://")) {
                     try {
                         Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
@@ -105,6 +117,8 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onPageFinished(WebView view, String url) {
                 progressBar.setVisibility(View.GONE);
+                pageReady = true;
+                dismissLaunchIfReady();
             }
         });
 
@@ -124,7 +138,6 @@ public class MainActivity extends AppCompatActivity {
                 return super.onConsoleMessage(consoleMessage);
             }
 
-            // Handle Camera & Media permissions requested by HTML5 getUserMedia
             @Override
             public void onPermissionRequest(final PermissionRequest request) {
                 runOnUiThread(() -> {
@@ -159,8 +172,60 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // Load local bundled web assets
         webView.loadUrl("file:///android_asset/www/index.html");
+    }
+
+    private void startPremiumLaunchAnimation() {
+        launchOverlay.setVisibility(View.VISIBLE);
+        launchOverlay.setAlpha(1f);
+        launchLogo.setAlpha(0f);
+        launchLogo.setScaleX(0.72f);
+        launchLogo.setScaleY(0.72f);
+        launchLogo.setRotation(-2f);
+        launchGoldLine.setScaleX(0.05f);
+        launchGoldLine.setAlpha(0f);
+
+        ObjectAnimator logoAlpha = ObjectAnimator.ofFloat(launchLogo, View.ALPHA, 0f, 1f);
+        ObjectAnimator logoScaleX = ObjectAnimator.ofFloat(launchLogo, View.SCALE_X, 0.72f, 1.06f, 1f);
+        ObjectAnimator logoScaleY = ObjectAnimator.ofFloat(launchLogo, View.SCALE_Y, 0.72f, 1.06f, 1f);
+        ObjectAnimator logoRotation = ObjectAnimator.ofFloat(launchLogo, View.ROTATION, -2f, 1.2f, 0f);
+
+        AnimatorSet logoSet = new AnimatorSet();
+        logoSet.playTogether(logoAlpha, logoScaleX, logoScaleY, logoRotation);
+        logoSet.setDuration(900);
+        logoSet.setInterpolator(new AccelerateDecelerateInterpolator());
+
+        ObjectAnimator lineAlpha = ObjectAnimator.ofFloat(launchGoldLine, View.ALPHA, 0f, 1f);
+        ObjectAnimator lineScale = ObjectAnimator.ofFloat(launchGoldLine, View.SCALE_X, 0.05f, 1f);
+        AnimatorSet lineSet = new AnimatorSet();
+        lineSet.playTogether(lineAlpha, lineScale);
+        lineSet.setStartDelay(430);
+        lineSet.setDuration(620);
+        lineSet.setInterpolator(new AccelerateDecelerateInterpolator());
+
+        logoSet.start();
+        lineSet.start();
+
+        launchHandler.postDelayed(() -> {
+            minimumLaunchTimeReached = true;
+            dismissLaunchIfReady();
+        }, 1500);
+    }
+
+    private void dismissLaunchIfReady() {
+        if (!pageReady || !minimumLaunchTimeReached || launchDismissed) {
+            return;
+        }
+        launchDismissed = true;
+        launchOverlay.animate()
+                .alpha(0f)
+                .setDuration(360)
+                .setInterpolator(new AccelerateDecelerateInterpolator())
+                .withEndAction(() -> {
+                    launchOverlay.setVisibility(View.GONE);
+                    launchOverlay.setAlpha(1f);
+                })
+                .start();
     }
 
     private void checkAndRequestPermissions() {
@@ -168,9 +233,7 @@ public class MainActivity extends AppCompatActivity {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
                 ActivityCompat.requestPermissions(
                     this,
-                    new String[]{
-                        Manifest.permission.CAMERA
-                    },
+                    new String[]{Manifest.permission.CAMERA},
                     PERMISSION_REQUEST_CODE
                 );
             }
@@ -198,6 +261,12 @@ public class MainActivity extends AppCompatActivity {
                 filePathCallback = null;
             }
         }
+    }
+
+    @Override
+    protected void onDestroy() {
+        launchHandler.removeCallbacksAndMessages(null);
+        super.onDestroy();
     }
 
     @Override
