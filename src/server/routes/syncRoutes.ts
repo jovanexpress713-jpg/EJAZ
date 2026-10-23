@@ -242,6 +242,18 @@ syncRouter.post('/push', authenticate, (req: AuthenticatedRequest, res: Response
           break;
         }
 
+        case 'HANDOVER': {
+          const existingIdx = db.dailyHandovers.findIndex(h => h.id === item.entityId);
+          if (item.action === 'DELETE') {
+            if (existingIdx >= 0) db.dailyHandovers.splice(existingIdx, 1);
+          } else if (item.payload) {
+            if (existingIdx >= 0) db.dailyHandovers[existingIdx] = { ...db.dailyHandovers[existingIdx], ...item.payload };
+            else db.dailyHandovers.unshift(item.payload);
+          }
+          appliedIds.push(item.id);
+          break;
+        }
+
         case 'SETTINGS': {
           if (item.action !== 'DELETE' && item.payload && typeof item.payload === 'object') {
             db.settings = { ...db.settings, ...item.payload };
