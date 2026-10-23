@@ -13,6 +13,7 @@ import { StorageService } from '../services/storage';
 import { SyncEngine } from '../services/syncEngine';
 import { ApiClient } from '../services/apiClient';
 import { User } from '../types';
+import { generateSalt, hashPasswordWithSalt } from '../services/security';
 import { SYSTEM_INFO } from '../constants/systemInfo';
 import { AboutSystemModal } from './AboutSystemModal';
 import { ChangePasswordModal } from './ChangePasswordModal';
@@ -78,9 +79,27 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onLogi
 
       // 2. Fallback to local authentication when offline
       const users = StorageService.getUsers();
-      const matched = users.find(
-        u => u.username.toLowerCase() === username.trim().toLowerCase() && u.password === password
+      const candidate = users.find(
+        u => u.username.toLowerCase() === username.trim().toLowerCase()
       );
+      let matched: User | undefined;
+      if (candidate) {
+        if (candidate.passwordHash && candidate.passwordSalt) {
+          const attemptedHash = await hashPasswordWithSalt(password, candidate.passwordSalt);
+          if (attemptedHash === candidate.passwordHash) matched = candidate;
+        } else if (candidate.password === password) {
+          matched = candidate;
+          // Upgrade a legacy plaintext password to a salted hash after a successful login.
+          if (!candidate.mustChangePassword) {
+            const salt = generateSalt();
+            const passwordHash = await hashPasswordWithSalt(password, salt);
+            const upgradedUser: User = { ...candidate, passwordHash, passwordSalt: salt };
+            delete upgradedUser.password;
+            StorageService.saveUser(upgradedUser);
+            matched = upgradedUser;
+          }
+        }
+      }
 
       if (matched) {
         if (!matched.active) {
