@@ -109,8 +109,41 @@ try {
   result = await request('/api/customers');
   assert(result.response.ok && result.body.customers.some(customer => customer.id === customerId), 'customer list includes the newly created customer');
 
+  // Simulate two independent office devices exchanging data through the LAN server.
+  // Device A sends a queued customer operation to the central server.
+  const pushedCustomerId = 'sync-customer-device-a';
+  const pushedItem = {
+    id: 'outbox-device-a-001',
+    entityType: 'CUSTOMER',
+    entityId: pushedCustomerId,
+    action: 'CREATE',
+    payload: {
+      id: pushedCustomerId,
+      name: 'عميل جهاز المكتب A',
+      phone: '700000002',
+      address: 'محاكاة شبكة المكتب',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+    timestamp: new Date().toISOString(),
+    authorId: 'integration-owner',
+    authorName: 'اختبار جهاز المكتب A',
+    status: 'PENDING',
+    retryCount: 0,
+    checksum: 'test-checksum-device-a',
+  };
+  result = await request('/api/sync/push', {
+    method: 'POST',
+    body: { items: [pushedItem], deviceId: 'SIMULATED-OFFICE-DEVICE-A', deviceName: 'محاكاة جهاز المكتب A' },
+  });
+  assert(result.response.ok && result.body.success === true && result.body.appliedIds.includes(pushedItem.id), 'simulated office device A pushes a queued customer operation');
+  assert(result.body.processedCount === 1, 'central server confirms exactly one applied sync operation');
+
+  // Device B independently pulls from the same server and must see A's customer.
   result = await request('/api/sync/pull');
-  assert(result.response.ok && result.body.success === true && result.body.data.customers.some(customer => customer.id === customerId), 'authenticated central sync pull returns the customer');
+  assert(result.response.ok && result.body.success === true && result.body.data.customers.some(customer => customer.id === pushedCustomerId && customer.name === 'عميل جهاز المكتب A'), 'simulated office device B receives device A customer on pull');
+  result = await request('/api/sync/pull');
+  assert(result.response.ok && result.body.success === true && result.body.data.customers.some(customer => customer.id === customerId), 'authenticated central sync pull returns the original customer');
 
   result = await request('/api/backup/export');
   assert(result.response.ok && JSON.stringify(result.body).includes(customerId), 'authorized backup export contains persisted customer data');
