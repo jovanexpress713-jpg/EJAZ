@@ -515,7 +515,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     const updated = await StorageService.getStorageDiagnostics();
     setStorageDiagnostics(updated);
     setIsVerifyingStorage(false);
-    setStorageMsg(granted ? 'تم تفعيل وتأكيد حماية التخزين الدائم اللانهائي بنجاح.' : 'تم تشغيل التخزين اللانهائي.');
+    setStorageMsg(granted ? 'تم طلب تفعيل التخزين الدائم؛ السعة الفعلية حسب الجهاز والمتصفح.' : 'التخزين المحلي متاح؛ قد يرفض المتصفح طلب الحفظ الدائم.');
     setTimeout(() => setStorageMsg(null), 4000);
   };
 
@@ -525,7 +525,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     const updated = await StorageService.getStorageDiagnostics();
     setStorageDiagnostics(updated);
     setIsVerifyingStorage(false);
-    setStorageMsg('تمت مزامنة وفحص سلامة التخزين اللانهائي وقاعدة البيانات بنجاح.');
+    setStorageMsg('تم فحص التخزين المحلي؛ لم يتم إثبات اتصال قاعدة بيانات مركزية.');
     setTimeout(() => setStorageMsg(null), 4000);
     onRefresh();
   };
@@ -2131,7 +2131,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <div>
                 <h4 className="text-sm font-bold text-slate-900">استعادة سريعة للبيانات (Turbo Import)</h4>
                 <p className="text-xs text-slate-600 leading-relaxed mt-1">
-                  استيراد ومعالجة فائقة السرعة لملف البيانات دون تجميد للشاشة وبكتابة مجمعة في محرك 1TB.
+                  استيراد ومعالجة فائقة السرعة لملف البيانات دون تجميد للشاشة وبكتابة مجمعة في محرك IndexedDB المحلي، بسعة يحددها الجهاز والمتصفح.
                 </p>
               </div>
 
@@ -2432,7 +2432,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                       Turbo Mode ⚡
                     </span>
                   </h3>
-                  <p className="text-[11px] text-slate-400 mt-0.5">معالجة دفعات متوازية ومزامنة فورية مع قاعدة بيانات 1TB</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">معالجة دفعات للبيانات المحلية؛ المزامنة المركزية تتطلب خادمًا مُعدًا</p>
                 </div>
               </div>
               {!isImporting && (
@@ -2492,7 +2492,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                         </span>
                       </div>
                       <p className="text-xs text-emerald-800 mt-1 leading-relaxed">
-                        تمت قراءة وتحليل وحفظ كافة السجلات في محرك IndexedDB Enterprise دون أي تأخير، والشاشات جاهزة للعمل فورياً.
+                        اكتملت معالجة ملف البيانات المحلي. يُرجى التحقق من عدد السجلات ومراجعة البيانات المستوردة قبل متابعة العمل.
                       </p>
                     </div>
                   </div>
