@@ -17,6 +17,7 @@ import {
   Layers, 
   Lock,
   Building,
+  Building2,
   CheckCircle2,
   FolderArchive,
   Database,
@@ -148,13 +149,13 @@ export const AboutSystemModal: React.FC<AboutSystemModalProps> = ({ isOpen, onCl
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-xl font-black text-white">نظام <span className="text-[#F97316]">إيجـاز</span></h2>
+                <h2 className="text-lg sm:text-xl font-black text-white">VICTORIA <span className="text-[#F97316]">Logistics ERP</span></h2>
                 <span className="bg-orange-500/20 text-orange-400 border border-orange-500/30 text-[10px] font-mono font-bold px-2 py-0.5 rounded-full">
                   v{SYSTEM_INFO.version} {SYSTEM_INFO.edition}
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                {SYSTEM_INFO.systemNameAr}
+                {SYSTEM_INFO.systemNameAr} • {SYSTEM_INFO.moduleNameAr}
               </p>
             </div>
           </div>
@@ -162,6 +163,29 @@ export const AboutSystemModal: React.FC<AboutSystemModalProps> = ({ isOpen, onCl
 
         {/* Modal Scrollable Body */}
         <div className="p-5 sm:p-6 space-y-5 overflow-y-auto flex-1 text-xs text-slate-700 dark:text-slate-300">
+          {/* Operating Institution Card - مؤسسة إيجاز للنقليات */}
+          <div className="bg-gradient-to-br from-amber-500/10 via-orange-500/10 to-slate-900/60 rounded-2xl p-4 sm:p-5 border border-amber-500/30 text-white relative overflow-hidden">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <span className="p-1.5 bg-amber-500/20 text-amber-400 rounded-lg border border-amber-500/30">
+                  <Building2 className="w-4 h-4" />
+                </span>
+                <span className="text-xs font-black tracking-wide text-amber-400">
+                  المؤسسة المستفيدة والمشغلة للنظام
+                </span>
+              </div>
+              <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2.5 py-0.5 rounded-full font-bold border border-amber-500/30">
+                مرخص رسمي
+              </span>
+            </div>
+            <h4 className="text-base sm:text-lg font-black text-white">
+              مؤسسة إيجـاز للنقليات (Ejaz Transport)
+            </h4>
+            <p className="text-slate-300 text-xs mt-1 leading-relaxed">
+              كافة المعاملات الميدانية والتشغيلية، البوالص المطبوعة، سندات القبض والصرف، كشوفات السائقين، والتقارير المالية تُصدر رسمياً باسم وشعار وبيانات <strong>مؤسسة إيجاز للنقليات</strong>.
+            </p>
+          </div>
+
           {/* Main Developer Highlight Card */}
           <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-2xl p-4 sm:p-5 shadow-md border border-slate-700 relative overflow-hidden">
             <div className="absolute top-0 left-0 w-32 h-32 bg-orange-500/10 rounded-full blur-2xl pointer-events-none" />

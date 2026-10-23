@@ -4,12 +4,14 @@ interface EjazLogoProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';
   variant?: 'full' | 'icon' | 'white' | 'dark';
   className?: string;
+  showSubtitle?: boolean;
 }
 
 export const EjazLogo: React.FC<EjazLogoProps> = ({
   size = 'md',
   variant = 'full',
   className = '',
+  showSubtitle = true,
 }) => {
   const iconSizes = {
     sm: 'w-8 h-8',
@@ -28,8 +30,8 @@ export const EjazLogo: React.FC<EjazLogoProps> = ({
   const isLight = variant === 'white';
 
   return (
-    <div className={`flex items-center gap-3 select-none ${className}`} dir="rtl">
-      {/* Visual Emblem */}
+    <div className={`flex items-center gap-2.5 sm:gap-3 select-none ${className}`} dir="rtl">
+      {/* Visual Emblem - مؤسسة إيجاز للنقليات */}
       <div className={`relative flex-shrink-0 flex items-center justify-center rounded-xl transition-transform ${iconSizes[size]}`}>
         <svg
           viewBox="0 0 100 100"
@@ -88,24 +90,26 @@ export const EjazLogo: React.FC<EjazLogoProps> = ({
         </svg>
       </div>
 
-      {/* Corporate Typography */}
+      {/* Corporate Typography - اسم وشعار مؤسسة إيجاز للنقليات */}
       {variant !== 'icon' && (
         <div className="flex flex-col text-right justify-center">
           <div
             className={`tracking-tight leading-tight ${textSizes[size].title} ${
-              isLight ? 'text-white' : 'text-slate-900'
+              isLight ? 'text-white' : 'text-slate-900 dark:text-white'
             }`}
           >
-            <span className="text-[#F97316]">إيجـاز </span>
-            <span>للنقليات</span>
+            <span className="text-[#F97316] font-black">إيجـاز </span>
+            <span className="font-extrabold">للنقليات</span>
           </div>
-          <div
-            className={`font-medium tracking-wider uppercase font-sans ${textSizes[size].sub} ${
-              isLight ? 'text-slate-300' : 'text-slate-500'
-            }`}
-          >
-            EJAZ TRANSPORT
-          </div>
+          {showSubtitle && (
+            <div
+              className={`font-semibold tracking-wider uppercase font-sans ${textSizes[size].sub} ${
+                isLight ? 'text-slate-300' : 'text-slate-500 dark:text-slate-400'
+              }`}
+            >
+              EJAZ TRANSPORT
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -36,6 +36,7 @@ import {
 import { EjazLogo } from './EjazLogo';
 import { User, AppNotification } from '../types';
 import { NetworkStatusIndicator } from './NetworkStatusIndicator';
+import { SYSTEM_INFO } from '../constants/systemInfo';
 
 export interface HeaderProps {
   currentUser: User;
@@ -137,10 +138,14 @@ export const Header: React.FC<HeaderProps> = ({
             type="button"
             onClick={() => handleTabChange('DASHBOARD')}
             className="cursor-pointer hover:opacity-95 transition flex items-center gap-2 bg-transparent border-0 p-0 text-right shrink-0"
-            title="الانتقال إلى لوحة التحكم الرئيسية"
+            title="الانتقال إلى لوحة التحكم الرئيسية - مؤسسة إيجاز للنقليات"
           >
             <EjazLogo size="sm" variant={theme === 'dark' ? 'white' : 'dark'} />
           </button>
+          <div className="hidden lg:flex flex-col text-[10px] leading-tight text-slate-400 dark:text-slate-500 border-r border-slate-200 dark:border-slate-800 pr-2.5 mr-0.5 select-none">
+            <span className="font-mono font-bold text-slate-500 dark:text-slate-400">VICTORIA ERP</span>
+            <span className="text-[9px]">v{SYSTEM_INFO.version}</span>
+          </div>
         </div>
 
         {/* LEFT GROUP: زر الوضع الليلي/النهاري، زر الإشعارات، وحساب مدير النظام */}

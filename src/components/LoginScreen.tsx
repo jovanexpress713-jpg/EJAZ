@@ -131,7 +131,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onLogi
         transition={{ duration: 0.5 }}
         className="w-full max-w-md bg-slate-800/90 rounded-2xl border border-slate-700/70 shadow-2xl p-6 sm:p-8 backdrop-blur-xl relative z-10"
       >
-        {/* Header Branding */}
+        {/* Header Branding - مؤسسة إيجاز للنقليات */}
         <div className="flex flex-col items-center text-center mb-6">
           <div className="p-3 bg-slate-900/90 rounded-2xl border border-slate-700 mb-3 shadow-inner">
             <EjazLogo size="lg" variant="icon" />
@@ -139,9 +139,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onLogi
           <h2 className="text-2xl font-black text-white">
             مؤسسة <span className="text-[#F97316]">إيجـاز</span> للنقليات
           </h2>
-          <p className="text-xs text-slate-400 mt-1">
-            بوابة الدخول للنظام الإداري والتشغيلي الموحد (Victoria Logistics ERP)
+          <p className="text-xs text-slate-300 mt-1 font-medium">
+            بوابة الدخول الموحدة لإدارة أسطول النقل والعمليات
           </p>
+          <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-900/80 border border-slate-700 text-[10px] text-slate-400 font-mono">
+            <span className="text-orange-400 font-bold">VICTORIA Logistics ERP</span>
+            <span className="opacity-50">•</span>
+            <span>نظام التشغيل المعتمد</span>
+          </div>
         </div>
 
         {/* First Run Owner Setup Banner Button */}

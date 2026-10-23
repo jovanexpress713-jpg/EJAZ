@@ -469,20 +469,20 @@ export default function App() {
                   <path d="M26 29V11L30 8V29H26Z" fill="#F59E0B" />
                 </svg>
 
-                {/* Typography: إيجــاز / ERP */}
+                {/* Typography: مؤسسة إيجاز للنقليات */}
                 <div className="flex flex-col text-right leading-none justify-center">
-                  <span className="text-white font-black text-lg sm:text-xl tracking-tight">إيجـاز</span>
-                  <span className="text-amber-500 font-black text-[11px] sm:text-xs tracking-wider mt-0.5">ERP</span>
+                  <span className="text-white font-black text-base sm:text-lg tracking-tight">مؤسسة إيجـاز للنقليات</span>
+                  <span className="text-amber-400 font-bold text-[10px] sm:text-[11px] tracking-wider mt-0.5 font-mono">EJAZ TRANSPORT ERP</span>
                 </div>
               </div>
 
               {/* Vertical Divider */}
               <div className="h-8 w-px bg-slate-700/80 hidden sm:block shrink-0" />
 
-              {/* 2. نص حقوق الملكية واسم الشركة */}
+              {/* 2. نص نظام التشغيل وحقوق الشركة المنتجة */}
               <div className="flex flex-col text-right leading-tight">
-                <span className="text-slate-100 font-bold text-xs sm:text-[13px]">© جميع الحقوق محفوظة</span>
-                <span className="text-amber-400 font-bold text-xs sm:text-[13px] mt-0.5">فكتوريا لاين سوفت للأنظمة والبرمجة</span>
+                <span className="text-slate-200 font-bold text-xs sm:text-[13px]">نظام VICTORIA Logistics ERP المعتمد</span>
+                <span className="text-amber-400 font-semibold text-xs sm:text-[12px] mt-0.5">تطوير: فكتوريا لاين سوفت للأنظمة والبرمجة</span>
               </div>
             </div>
 

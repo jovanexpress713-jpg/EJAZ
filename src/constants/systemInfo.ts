@@ -9,6 +9,10 @@ export interface SystemInfoMetadata {
   name: string;
   systemNameAr: string;
   systemNameEn: string;
+  clientNameAr: string;
+  clientNameEn: string;
+  moduleNameAr: string;
+  moduleNameEn: string;
   version: string;
   buildNumber: string;
   edition: string;
@@ -33,11 +37,15 @@ export interface SystemInfoMetadata {
 }
 
 export const SYSTEM_INFO: SystemInfoMetadata = Object.freeze({
-  name: 'إيجاز',
-  systemNameAr: 'نظام إيجاز لإدارة عمليات النقل واللوجستيات والفوترة',
-  systemNameEn: 'Ejaz Transport & Logistics Management System',
-  version: '2.6.0',
-  buildNumber: '2026.09.03',
+  name: 'VICTORIA Logistics ERP',
+  systemNameAr: 'نظام فيكتوريا لإدارة العمليات اللوجستية والنقل (VICTORIA Logistics ERP)',
+  systemNameEn: 'VICTORIA Logistics ERP - Enterprise Resource Planning',
+  clientNameAr: 'مؤسسة إيجاز للنقليات',
+  clientNameEn: 'Ejaz Transport',
+  moduleNameAr: 'إدارة عمليات أسطول مؤسسة إيجاز للنقليات',
+  moduleNameEn: 'Ejaz Transport & Logistics Operations',
+  version: '2.7.0',
+  buildNumber: '2026.10.23',
   edition: 'Enterprise Pro (إصدار المؤسسات)',
   releaseYear: '2026',
   developer: Object.freeze({
@@ -48,13 +56,13 @@ export const SYSTEM_INFO: SystemInfoMetadata = Object.freeze({
     contactNumber: '+967771119726',
     contactUrl: 'tel:+967771119726',
     whatsappUrl: 'https://wa.me/967771119726',
-    officialCopyright: 'نظام إيجاز © جميع الحقوق محفوظة\nتم التصميم والتطوير والبرمجة بواسطة فكتوريا لاين سوفت للأنظمة والبرمجة\n+967771119726',
-    footerCopyright: 'نظام إيجاز © جميع الحقوق محفوظة | تطوير وبرمجة فكتوريا لاين سوفت للأنظمة والبرمجة | +967771119726',
+    officialCopyright: 'نظام VICTORIA Logistics ERP © جميع الحقوق محفوظة\nتم التصميم والتطوير والبرمجة بواسطة فكتوريا لاين سوفت للأنظمة والبرمجة\n+967771119726',
+    footerCopyright: 'مؤسسة إيجاز للنقليات © جميع الحقوق محفوظة | مشغل بنظام VICTORIA Logistics ERP | تطوير وبرمجة فكتوريا لاين سوفت للأنظمة والبرمجة | +967771119726',
   }),
   license: Object.freeze({
-    type: 'ترخيص برمجي تجاري معتمد',
+    type: 'ترخيص برمجي تجاري معتمد لمؤسسة إيجاز للنقليات',
     status: 'مرخص ومحمي برمجياً',
     isProtected: true,
-    protectedNotice: 'حقوق البرمجة والتطوير والتصميم محفوظة بالكامل لشركة «فكتوريا لاين سوفت للأنظمة والبرمجة». بيانات وحقوق المطور ثابتة ومحمية في شفرة النظام ولا يمكن تعديلها أو إزالتها من لوحة التحكم.',
+    protectedNotice: 'حقوق البرمجة والتطوير والتصميم محفوظة بالكامل لشركة «فكتوريا لاين سوفت للأنظمة والبرمجة». تم ترخيص هذا النظام حصرياً لمؤسسة إيجاز للنقليات لإدارة كافة العمليات التشغيلية والمالية وبوالص الشحن.',
   }),
 });
