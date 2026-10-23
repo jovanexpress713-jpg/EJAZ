@@ -10,6 +10,7 @@ import { Lock, Eye, EyeOff, ShieldCheck, CheckCircle2, AlertCircle, X } from 'lu
 import { User } from '../types';
 import { StorageService } from '../services/storage';
 import { ApiClient } from '../services/apiClient';
+import { hashPasswordWithSalt, generateSalt } from '../services/security';
 
 interface ChangePasswordModalProps {
   isOpen: boolean;
@@ -35,15 +36,23 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
 
     // If not mandatory, verify current password
-    if (!isMandatory && currentUser.password && currentPassword !== currentUser.password) {
-      setErrorMsg('كلمة المرور الحالية غير صحيحة.');
-      return;
+    if (!isMandatory) {
+      let currentPasswordValid = false;
+      if (currentUser.passwordHash && currentUser.passwordSalt) {
+        currentPasswordValid = (await hashPasswordWithSalt(currentPassword, currentUser.passwordSalt)) === currentUser.passwordHash;
+      } else {
+        currentPasswordValid = currentPassword === (currentUser.password || '');
+      }
+      if (!currentPasswordValid) {
+        setErrorMsg('كلمة المرور الحالية غير صحيحة.');
+        return;
+      }
     }
 
     if (newPassword.length < 5) {
@@ -57,16 +66,15 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
     }
 
     try {
-      StorageService.changeUserPassword(currentUser.id, newPassword);
+      await StorageService.changeUserPassword(currentUser.id, newPassword);
 
       // Also call server API if online
       ApiClient.changePassword(currentPassword || currentUser.password || '', newPassword)
         .catch(err => console.warn('Server password sync note:', err));
 
       setSuccessMsg('تم تحديث كلمة المرور وتأمين حسابك بنجاح!');
-      const updatedUser: User = {
+      const updatedUser = StorageService.getUsers().find(user => user.id === currentUser.id) || {
         ...currentUser,
-        password: newPassword,
         mustChangePassword: false,
       };
       setTimeout(() => {
