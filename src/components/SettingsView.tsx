@@ -102,7 +102,7 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     name: 'الإدارة المالية والخزينة',
     badgeColor: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200',
     items: [
-      { key: 'canManageFinancials', label: 'السندات والقيود المحاسبية', desc: 'إصدار سندات القبض والصرف، تسجيل المصروفات، وتعديل الحسابات' },
+      { key: 'canManageFinancials', label: 'السندات والحركات المالية', desc: 'إصدار سندات القبض والصرف، تسجيل المصروفات ومراجعة أرصدة الرحلات' },
       { key: 'canCloseCashbox', label: 'إقفال الصندوق النقدية', desc: 'تنفيذ الإقفال اليومي للصناديق النقدية ومطابقة النقدية الفعلية' },
     ]
   },
@@ -150,7 +150,7 @@ export const ROLES_METADATA: {
     title: 'المحاسب المالي', 
     typeBadge: 'مالي ومحاسبي',
     badgeClass: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800', 
-    desc: 'الحسابات، القيود، السندات، الإيرادات والمصروفات، الأرصدة، كشوفات الحساب والتقارير المالية والضريبية.' 
+    desc: 'متابعة التحصيلات والمصروفات وأرصدة الرحلات وكشوف الحساب والتقارير المالية التشغيلية.' 
   },
   { 
     role: 'CASHIER', 
