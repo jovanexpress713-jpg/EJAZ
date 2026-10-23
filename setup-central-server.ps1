@@ -15,7 +15,7 @@ if (-not (Test-Path ".env")) {
   function New-Secret([int]$Bytes = 48) {
     $buffer = New-Object byte[] $Bytes
     $rng.GetBytes($buffer)
-    return ([Convert]::ToHexString($buffer)).ToLowerInvariant()
+    return ([BitConverter]::ToString($buffer)).Replace('-', '').ToLowerInvariant()
   }
   $jwt = New-Secret 48
   $setup = New-Secret 48
