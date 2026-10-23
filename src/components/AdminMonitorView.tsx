@@ -28,7 +28,19 @@ import {
   FileText,
   Lock,
   Wifi,
-  WifiOff
+  WifiOff,
+  UserCheck,
+  UserPlus,
+  Key,
+  Shield,
+  Edit,
+  Trash2,
+  Copy,
+  Save,
+  CheckSquare,
+  Square,
+  Layers,
+  Crown
 } from 'lucide-react';
 import { 
   User, 
@@ -38,11 +50,37 @@ import {
   AuditLog, 
   SyncOutboxItem, 
   SyncDevice, 
-  CompanySettings 
+  CompanySettings,
+  UserRole,
+  UserPermissions
 } from '../types';
-import { StorageService } from '../services/storage';
+import { StorageService, getDefaultPermissions } from '../services/storage';
 import { SyncEngine } from '../services/syncEngine';
 import { exportToExcel } from '../utils/excelExporter';
+import { generateTemporaryPassword } from '../services/security';
+
+export const PERMISSION_DEFINITIONS: {
+  key: keyof UserPermissions;
+  label: string;
+  desc: string;
+  category: 'عام' | 'العمليات' | 'الأسطول' | 'المالية' | 'التقارير' | 'الإدارة' | 'الرقابة';
+}[] = [
+  { key: 'canViewDashboard', label: 'استعراض لوحة التحكم والمؤشرات', desc: 'الاطلاع على الإحصائيات العامة والمخططات والنشاط اللحظي', category: 'عام' },
+  { key: 'canManageTrips', label: 'إدارة الرحلات والبوليصات', desc: 'إضافة وتعديل وحذف الرحلات ومتابعة مسارات النقل وإصدار البوليصة', category: 'العمليات' },
+  { key: 'canManageCustomers', label: 'إدارة بيانات العملاء والمديونيات', desc: 'تسجيل وتعديل العملاء وكشوفات الحساب وأرصدة المديونيات', category: 'العمليات' },
+  { key: 'canManageDrivers', label: 'إدارة ملفات السائقين والوثائق', desc: 'إضافة السائقين، البطاقات المهنية، وفحص انتهاء الرخص والربط بالشاحنات', category: 'الأسطول' },
+  { key: 'canManageTrucks', label: 'إدارة الشاحنات والأسطول', desc: 'تسجيل الشاحنات، اللوحات، الأرقام الرقمية، وحالة الفحص والملكية', category: 'الأسطول' },
+  { key: 'canManageMaintenance', label: 'أوامر الصيانة الدورية والطارئة', desc: 'جدولة ومتابعة صيانة الشاحنات وتغيير الزيوت وعدادات الكيلومتر', category: 'الأسطول' },
+  { key: 'canManageFinancials', label: 'العمليات وسندات الصرف والقبض', desc: 'إصدار سندات القبض، سداد دفعات الرحلات، وتسجيل مصروفات التشغيل', category: 'المالية' },
+  { key: 'canCloseCashbox', label: 'إقفال الصندوق وترحيل الورديات', desc: 'توثيق محاضر التسليم والترحيل النقدي للمالك وإقفال اليومية', category: 'المالية' },
+  { key: 'canApproveOperations', label: 'اعتماد العمليات المالية والتشغيلية', desc: 'الموافقة الرسمية على الرحلات وسندات الصرف والقبض المعلقة', category: 'الرقابة' },
+  { key: 'canViewReports', label: 'استعراض التقارير الشاملة', desc: 'الاطلاع على التقارير المالية والتشغيلية وكشوفات حساب السائقين والعملاء', category: 'التقارير' },
+  { key: 'canExportReports', label: 'تصدير التقارير إلى Excel وطباعتها', desc: 'تنزيل ملفات الإكسل (.xlsx) وطباعة الكشوفات الرسمية A4', category: 'التقارير' },
+  { key: 'canManageUsers', label: 'إدارة الموظفين وتعديل الصلاحيات', desc: 'إضافة مستخدمين جدد، تعيين الأدوار وتخصيص مصفوفة الصلاحيات الدقيقة', category: 'الإدارة' },
+  { key: 'canManageSettings', label: 'إعدادات النظام والهوية والضرائب', desc: 'تعديل بيانات المؤسسة، السجل التجاري، الرقم الضريبي والشروط', category: 'الإدارة' },
+  { key: 'canBackupRestore', label: 'النسخ الاحتياطي واستعادة البيانات', desc: 'تصدير واستيراد قواعد البيانات وإجراءات الحماية والتخزين', category: 'الإدارة' },
+  { key: 'canAccessSyncMonitor', label: 'شاشة الرقابة والمزامنة المركزية', desc: 'الوصول إلى سجل التدقيق الأمني ومراقبة الأجهزة وطابور المزامنة', category: 'الرقابة' },
+];
 
 interface AdminMonitorViewProps {
   currentUser: User;
@@ -53,6 +91,7 @@ interface AdminMonitorViewProps {
   settings: CompanySettings;
   onRefreshData: () => void;
   onNavigateToTrip?: (trip: Trip) => void;
+  initialSubTab?: 'ROLES_PERMISSIONS' | 'TIMELINE' | 'PENDING' | 'SYNC' | 'AUDIT';
 }
 
 export const AdminMonitorView: React.FC<AdminMonitorViewProps> = ({
@@ -64,8 +103,9 @@ export const AdminMonitorView: React.FC<AdminMonitorViewProps> = ({
   settings,
   onRefreshData,
   onNavigateToTrip,
+  initialSubTab = 'ROLES_PERMISSIONS',
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'TIMELINE' | 'PENDING' | 'SYNC' | 'AUDIT'>('TIMELINE');
+  const [activeSubTab, setActiveSubTab] = useState<'ROLES_PERMISSIONS' | 'TIMELINE' | 'PENDING' | 'SYNC' | 'AUDIT'>(initialSubTab);
   const [employeeFilter, setEmployeeFilter] = useState<string>('ALL');
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -75,8 +115,229 @@ export const AdminMonitorView: React.FC<AdminMonitorViewProps> = ({
   const [importBundleText, setImportBundleText] = useState<string>('');
   const [showImportModal, setShowImportModal] = useState<boolean>(false);
 
+  // User & Granular Permissions State
+  const [usersList, setUsersList] = useState<User[]>(() => StorageService.getUsers());
+  const [userSearchTerm, setUserSearchTerm] = useState('');
+  const [userRoleFilter, setUserRoleFilter] = useState<string>('ALL');
+  const [tempPassAlert, setTempPassAlert] = useState<string | null>(null);
+  const [userActionError, setUserActionError] = useState<string | null>(null);
+  const [copiedPassText, setCopiedPassText] = useState<string | null>(null);
+
+  // Edit Permissions Modal State
+  const [editingUserForPermissions, setEditingUserForPermissions] = useState<User | null>(null);
+  const [editPermissionsForm, setEditPermissionsForm] = useState<UserPermissions | null>(null);
+  const [editUserRole, setEditUserRole] = useState<UserRole>('OPERATIONS');
+  const [editUserFullName, setEditUserFullName] = useState('');
+  const [editUserPhone, setEditUserPhone] = useState('');
+  const [editUserActive, setEditUserActive] = useState(true);
+
+  // Add User Modal State
+  const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [newFullName, setNewFullName] = useState('');
+  const [newUsername, setNewUsername] = useState('');
+  const [newRole, setNewRole] = useState<UserRole>('OPERATIONS');
+  const [newPhone, setNewPhone] = useState('');
+  const [newTempPass, setNewTempPass] = useState(() => generateTemporaryPassword());
+  const [forceFirstChange, setForceFirstChange] = useState(true);
+
+  const refreshUsers = () => {
+    setUsersList(StorageService.getUsers());
+  };
+
+  const handleOpenEditPermissions = (user: User) => {
+    setEditingUserForPermissions(user);
+    setEditUserFullName(user.fullName);
+    setEditUserPhone(user.phone || '');
+    setEditUserRole(user.role);
+    setEditUserActive(user.active);
+    setEditPermissionsForm(user.permissions ? { ...user.permissions } : getDefaultPermissions(user.role));
+  };
+
+  const handleTogglePermission = (key: keyof UserPermissions) => {
+    if (!editPermissionsForm) return;
+    setEditPermissionsForm({
+      ...editPermissionsForm,
+      [key]: !editPermissionsForm[key],
+    });
+  };
+
+  const handleGrantAllPermissions = () => {
+    if (!editPermissionsForm) return;
+    const allTrue: UserPermissions = {
+      canViewDashboard: true,
+      canManageTrips: true,
+      canManageCustomers: true,
+      canManageDrivers: true,
+      canManageTrucks: true,
+      canManageMaintenance: true,
+      canManageFinancials: true,
+      canCloseCashbox: true,
+      canApproveOperations: true,
+      canViewReports: true,
+      canExportReports: true,
+      canManageUsers: true,
+      canManageSettings: true,
+      canBackupRestore: true,
+      canAccessSyncMonitor: true,
+    };
+    setEditPermissionsForm(allTrue);
+  };
+
+  const handleResetToRoleDefaults = () => {
+    setEditPermissionsForm(getDefaultPermissions(editUserRole));
+  };
+
+  const handleRevokeAllPermissions = () => {
+    if (!editPermissionsForm) return;
+    const allFalse: UserPermissions = {
+      canViewDashboard: false,
+      canManageTrips: false,
+      canManageCustomers: false,
+      canManageDrivers: false,
+      canManageTrucks: false,
+      canManageMaintenance: false,
+      canManageFinancials: false,
+      canCloseCashbox: false,
+      canApproveOperations: false,
+      canViewReports: false,
+      canExportReports: false,
+      canManageUsers: false,
+      canManageSettings: false,
+      canBackupRestore: false,
+      canAccessSyncMonitor: false,
+    };
+    setEditPermissionsForm(allFalse);
+  };
+
+  const handleSaveUserPermissions = () => {
+    if (!editingUserForPermissions || !editPermissionsForm) return;
+    setUserActionError(null);
+
+    const updatedUser: User = {
+      ...editingUserForPermissions,
+      fullName: editUserFullName.trim() || editingUserForPermissions.fullName,
+      phone: editUserPhone.trim(),
+      role: editUserRole,
+      active: editUserActive,
+      permissions: editPermissionsForm,
+    };
+
+    StorageService.saveUser(updatedUser, currentUser);
+    refreshUsers();
+    setEditingUserForPermissions(null);
+    setTempPassAlert(`تم حفظ وتحديث مصفوفة صلاحيات الموظف [ ${updatedUser.fullName} ] بنجاح.`);
+    setTimeout(() => setTempPassAlert(null), 5000);
+    onRefreshData();
+  };
+
+  const handleToggleUserActive = (user: User) => {
+    setUserActionError(null);
+    if (user.role === 'SUPER_ADMIN' && user.active) {
+      const activeSuperAdmins = usersList.filter(u => u.id !== user.id && u.role === 'SUPER_ADMIN' && u.active);
+      if (activeSuperAdmins.length === 0) {
+        setUserActionError('لا يمكن تعطيل حساب المالك أو آخر مدير نظام نشط.');
+        return;
+      }
+    }
+    const updated = { ...user, active: !user.active };
+    StorageService.saveUser(updated, currentUser);
+    refreshUsers();
+    onRefreshData();
+  };
+
+  const handleCreateUser = (e: React.FormEvent) => {
+    e.preventDefault();
+    setUserActionError(null);
+
+    if (!newFullName.trim() || !newUsername.trim()) {
+      setUserActionError('يرجى إدخال الاسم الكامل واسم المستخدم.');
+      return;
+    }
+
+    const cleanUsername = newUsername.trim().toLowerCase();
+    const existing = StorageService.getUsers();
+    if (existing.some(u => u.username.toLowerCase() === cleanUsername)) {
+      setUserActionError('اسم المستخدم مسجل مسبقاً. يرجى اختيار اسم مستخدم آخر.');
+      return;
+    }
+
+    const newUser: User = {
+      id: 'usr_' + Date.now().toString(36),
+      fullName: newFullName.trim(),
+      username: cleanUsername,
+      role: newRole,
+      phone: newPhone.trim(),
+      active: true,
+      password: newTempPass,
+      mustChangePassword: forceFirstChange,
+      permissions: getDefaultPermissions(newRole),
+      createdAt: new Date().toISOString(),
+    };
+
+    StorageService.saveUser(newUser, currentUser);
+    refreshUsers();
+    setShowAddUserModal(false);
+    setTempPassAlert(`تم إنشاء حساب الموظف [ ${newUser.fullName} ] بنجاح. كلمة المرور المؤقتة هي: [ ${newTempPass} ] — يرجى نسخها وتسليمها له.`);
+    setNewFullName('');
+    setNewUsername('');
+    setNewPhone('');
+    setNewTempPass(generateTemporaryPassword());
+    onRefreshData();
+  };
+
+  const handleResetUserPassword = (user: User) => {
+    const tempPass = generateTemporaryPassword();
+    try {
+      StorageService.resetUserPassword(user.id, tempPass, currentUser);
+      refreshUsers();
+      setTempPassAlert(`تمت إعادة تعيين كلمة مرور الموظف [ ${user.fullName} ] إلى: [ ${tempPass} ]. سيلتزم بتغييرها فور الدخول.`);
+      onRefreshData();
+    } catch (err: any) {
+      setUserActionError(err?.message || 'فشلت إعادة تعيين كلمة المرور.');
+    }
+  };
+
+  const handleDeleteUser = (user: User) => {
+    setUserActionError(null);
+    if (user.role === 'SUPER_ADMIN') {
+      setUserActionError('لا يمكن حذف حساب المالك أو مدير النظام العام.');
+      return;
+    }
+    if (!confirm(`هل أنت متأكد من حذف حساب الموظف "${user.fullName}" نهائياً من النظام؟`)) return;
+
+    try {
+      StorageService.deleteUser(user.id, currentUser);
+      refreshUsers();
+      onRefreshData();
+    } catch (err: any) {
+      setUserActionError(err?.message || 'حدث خطأ أثناء حذف المستخدم.');
+    }
+  };
+
+  const handleCopyPassword = (text: string) => {
+    navigator.clipboard?.writeText(text);
+    setCopiedPassText(text);
+    setTimeout(() => setCopiedPassText(null), 2500);
+  };
+
+  // Filtered users list
+  const filteredUsers = useMemo(() => {
+    return usersList.filter(u => {
+      if (userRoleFilter !== 'ALL' && u.role !== userRoleFilter) return false;
+      if (userSearchTerm.trim()) {
+        const q = userSearchTerm.toLowerCase();
+        return (
+          u.fullName.toLowerCase().includes(q) ||
+          u.username.toLowerCase().includes(q) ||
+          (u.phone && u.phone.includes(q))
+        );
+      }
+      return true;
+    });
+  }, [usersList, userRoleFilter, userSearchTerm]);
+
   // Available users for filtering
-  const allUsers = useMemo(() => StorageService.getUsers(), []);
+  const allUsers = useMemo(() => StorageService.getUsers(), [usersList]);
   const outboxItems = useMemo(() => SyncEngine.getOutbox(), [auditLogs]);
   const connectedDevices = useMemo(() => SyncEngine.getDevices(), [auditLogs]);
 
@@ -358,6 +619,19 @@ export const AdminMonitorView: React.FC<AdminMonitorViewProps> = ({
       <div className="flex border-b border-slate-200 dark:border-slate-700 gap-2 overflow-x-auto no-scrollbar">
         <button
           type="button"
+          onClick={() => setActiveSubTab('ROLES_PERMISSIONS')}
+          className={`px-4 py-2.5 text-xs sm:text-sm font-bold border-b-2 transition whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+            activeSubTab === 'ROLES_PERMISSIONS'
+              ? 'border-orange-500 text-orange-600 dark:text-orange-400'
+              : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+          }`}
+        >
+          <UserCheck className="w-4 h-4" />
+          <span>الصلاحيات وإدارة الأدوار ({usersList.length})</span>
+        </button>
+
+        <button
+          type="button"
           onClick={() => setActiveSubTab('TIMELINE')}
           className={`px-4 py-2.5 text-xs sm:text-sm font-bold border-b-2 transition whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
             activeSubTab === 'TIMELINE'
@@ -408,6 +682,286 @@ export const AdminMonitorView: React.FC<AdminMonitorViewProps> = ({
           <span>سجل التدقيق الأمني المحمي</span>
         </button>
       </div>
+
+      {/* SubTab 0: Roles & Permissions Matrix and Employee Management */}
+      {activeSubTab === 'ROLES_PERMISSIONS' && (
+        <div className="space-y-4">
+          {/* Action Alerts & Temporary Password Banner */}
+          {tempPassAlert && (
+            <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 rounded-xl p-3.5 flex items-start justify-between gap-3 shadow-xs animate-in fade-in">
+              <div className="flex items-start gap-2.5 text-emerald-800 dark:text-emerald-200 text-xs sm:text-sm font-medium">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                <span className="leading-relaxed">{tempPassAlert}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTempPassAlert(null)}
+                className="text-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-300 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {userActionError && (
+            <div className="bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800 rounded-xl p-3.5 flex items-start justify-between gap-3 shadow-xs animate-in fade-in">
+              <div className="flex items-start gap-2.5 text-rose-800 dark:text-rose-200 text-xs sm:text-sm font-medium">
+                <AlertTriangle className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
+                <span className="leading-relaxed">{userActionError}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setUserActionError(null)}
+                className="text-rose-500 hover:text-rose-700 dark:hover:text-rose-300 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {/* Top Actions & Filters Bar */}
+          <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
+            <div className="flex items-center gap-2 w-full md:w-auto flex-wrap">
+              {/* Search User Input */}
+              <div className="relative flex-1 sm:w-64">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-2.5" />
+                <input
+                  type="text"
+                  value={userSearchTerm}
+                  onChange={e => setUserSearchTerm(e.target.value)}
+                  placeholder="ابحث بالاسم أو اسم المستخدم أو الهاتف..."
+                  className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg pr-9 pl-3 py-1.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-orange-500"
+                />
+              </div>
+
+              {/* Role filter */}
+              <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs">
+                <Filter className="w-3.5 h-3.5 text-slate-400" />
+                <select
+                  value={userRoleFilter}
+                  onChange={e => setUserRoleFilter(e.target.value)}
+                  className="bg-transparent border-0 text-slate-800 dark:text-slate-200 font-semibold focus:outline-none cursor-pointer"
+                >
+                  <option value="ALL">جميع الأدوار ({usersList.length})</option>
+                  <option value="SUPER_ADMIN">المالك / مدير عام</option>
+                  <option value="COMPANY_MANAGER">مدير الشركة</option>
+                  <option value="OPERATIONS">مدير العمليات</option>
+                  <option value="ACCOUNTANT">محاسب مالي</option>
+                  <option value="CASHIER">أمين الصندوق</option>
+                  <option value="AUDITOR">مدقق حسابات</option>
+                  <option value="VIEWER">مستعرض اطلاع</option>
+                </select>
+              </div>
+
+              {/* Stats Counters */}
+              <div className="hidden lg:flex items-center gap-2 text-[11px] font-bold">
+                <span className="px-2.5 py-1 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                  {usersList.filter(u => u.active).length} نشط
+                </span>
+                {usersList.some(u => !u.active) && (
+                  <span className="px-2.5 py-1 rounded-md bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800">
+                    {usersList.filter(u => !u.active).length} معطل
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Add User Button */}
+            <button
+              type="button"
+              onClick={() => {
+                setNewFullName('');
+                setNewUsername('');
+                setNewPhone('');
+                setNewRole('OPERATIONS');
+                setNewTempPass(generateTemporaryPassword());
+                setForceFirstChange(true);
+                setShowAddUserModal(true);
+              }}
+              className="w-full md:w-auto px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-md cursor-pointer shrink-0"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>إضافة مستخدم جديد</span>
+            </button>
+          </div>
+
+          {/* Users Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+            {filteredUsers.length === 0 ? (
+              <div className="col-span-full bg-white dark:bg-slate-800 p-8 rounded-xl border border-slate-200 dark:border-slate-700 text-center text-slate-400 text-xs">
+                لا يوجد موظفون يطابقون خيارات البحث المحددة.
+              </div>
+            ) : (
+              filteredUsers.map(user => {
+                const perms = user.permissions || getDefaultPermissions(user.role);
+                const activeCount = Object.values(perms).filter(Boolean).length;
+                const isSuperAdmin = user.role === 'SUPER_ADMIN';
+
+                return (
+                  <div
+                    key={user.id}
+                    className={`bg-white dark:bg-slate-800 rounded-xl border p-4 shadow-xs transition hover:shadow-md flex flex-col justify-between gap-3 ${
+                      !user.active
+                        ? 'border-slate-300 dark:border-slate-700 opacity-70 bg-slate-50/50 dark:bg-slate-900/50'
+                        : isSuperAdmin
+                        ? 'border-amber-400/60 dark:border-amber-500/40'
+                        : 'border-slate-200 dark:border-slate-700'
+                    }`}
+                  >
+                    {/* User Header */}
+                    <div>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-3">
+                          {/* Avatar */}
+                          <div className={`relative w-10 h-10 rounded-full flex items-center justify-center font-bold text-white shadow-sm ${
+                            isSuperAdmin
+                              ? 'bg-gradient-to-tr from-amber-500 to-yellow-400 text-slate-950 font-black'
+                              : user.role === 'OPERATIONS'
+                              ? 'bg-gradient-to-tr from-blue-600 to-indigo-600'
+                              : user.role === 'ACCOUNTANT'
+                              ? 'bg-gradient-to-tr from-emerald-600 to-teal-600'
+                              : user.role === 'CASHIER'
+                              ? 'bg-gradient-to-tr from-purple-600 to-fuchsia-600'
+                              : 'bg-gradient-to-tr from-slate-600 to-slate-800'
+                          }`}>
+                            {isSuperAdmin ? (
+                              <Crown className="w-5 h-5 fill-current" />
+                            ) : (
+                              <span>{(user.fullName || user.username).charAt(0).toUpperCase()}</span>
+                            )}
+                            {user.active ? (
+                              <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white dark:border-slate-800 rounded-full" />
+                            ) : (
+                              <span className="absolute bottom-0 right-0 w-3 h-3 bg-rose-500 border-2 border-white dark:border-slate-800 rounded-full" />
+                            )}
+                          </div>
+
+                          {/* Info */}
+                          <div className="text-right">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-bold text-slate-900 dark:text-white text-sm">
+                                {user.fullName || user.username}
+                              </span>
+                              {isSuperAdmin && (
+                                <span className="text-[10px] bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded-md font-bold border border-amber-300 dark:border-amber-700">
+                                  مالك النظام
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[11px] text-slate-400 font-mono flex items-center gap-1">
+                              <span>@{user.username}</span>
+                              {user.phone && <span>• {user.phone}</span>}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Status Toggle Badge */}
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${
+                          user.active
+                            ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
+                            : 'bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-800'
+                        }`}>
+                          {user.active ? 'نشط' : 'معطل'}
+                        </span>
+                      </div>
+
+                      {/* Role & Permissions Level Summary */}
+                      <div className="mt-3.5 space-y-2 pt-2 border-t border-slate-100 dark:border-slate-700/60 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500 dark:text-slate-400 text-[11px]">الدور المعتمد:</span>
+                          <span className="font-bold text-slate-800 dark:text-slate-200">
+                            {user.role === 'SUPER_ADMIN' ? 'المالك / مدير عام' :
+                             user.role === 'COMPANY_MANAGER' ? 'مدير الشركة' :
+                             user.role === 'OPERATIONS' ? 'مدير العمليات' :
+                             user.role === 'ACCOUNTANT' ? 'المحاسب المالي' :
+                             user.role === 'CASHIER' ? 'أمين الصندوق' :
+                             user.role === 'AUDITOR' ? 'مدقق الحسابات' : 'مستعرض اطلاع'}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500 dark:text-slate-400 text-[11px]">مستوى الصلاحيات:</span>
+                          <span className="font-bold text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/50 px-2 py-0.5 rounded-md text-[11px]">
+                            {activeCount} من 15 صلاحية مفعلة
+                          </span>
+                        </div>
+
+                        {/* Micro Progress Bar of Permissions */}
+                        <div className="w-full bg-slate-100 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
+                          <div
+                            className="bg-gradient-to-r from-orange-500 to-amber-500 h-full rounded-full transition-all"
+                            style={{ width: `${(activeCount / 15) * 100}%` }}
+                          />
+                        </div>
+
+                        {user.mustChangePassword && (
+                          <div className="text-[10px] text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 p-1.5 rounded-md flex items-center gap-1">
+                            <Key className="w-3 h-3 shrink-0" />
+                            <span>كلمة مرور مؤقتة — يلزم التغيير عند الدخول</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Action Buttons Toolbar */}
+                    <div className="pt-2 border-t border-slate-100 dark:border-slate-700/60 grid grid-cols-2 gap-2 text-xs">
+                      {/* Edit Granular Permissions */}
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEditPermissions(user)}
+                        className="col-span-2 px-3 py-1.5 rounded-lg bg-orange-50 dark:bg-orange-950/40 hover:bg-orange-100 dark:hover:bg-orange-900/60 text-orange-700 dark:text-orange-300 border border-orange-200 dark:border-orange-800 font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                        title="تخصيص مصفوفة الصلاحيات الـ 15"
+                      >
+                        <ShieldCheck className="w-3.5 h-3.5 text-orange-500" />
+                        <span>تخصيص مصفوفة الصلاحيات</span>
+                      </button>
+
+                      {/* Reset Temporary Password */}
+                      <button
+                        type="button"
+                        onClick={() => handleResetUserPassword(user)}
+                        className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-semibold transition flex items-center justify-center gap-1 cursor-pointer text-[11px]"
+                        title="توليد كلمة مرور مؤقتة جديدة"
+                      >
+                        <Key className="w-3 h-3 text-amber-500" />
+                        <span>إعادة تعيين المرور</span>
+                      </button>
+
+                      {/* Toggle Active / Deactivate */}
+                      <button
+                        type="button"
+                        onClick={() => handleToggleUserActive(user)}
+                        disabled={isSuperAdmin && user.active}
+                        className={`px-2.5 py-1.5 rounded-lg font-semibold transition flex items-center justify-center gap-1 text-[11px] ${
+                          isSuperAdmin && user.active
+                            ? 'opacity-40 cursor-not-allowed bg-slate-100 dark:bg-slate-700 text-slate-400'
+                            : user.active
+                            ? 'bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900 cursor-pointer'
+                            : 'bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900 cursor-pointer'
+                        }`}
+                      >
+                        {user.active ? 'تعطيل الحساب' : 'تفعيل الحساب'}
+                      </button>
+
+                      {/* Delete User */}
+                      {!isSuperAdmin && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteUser(user)}
+                          className="col-span-2 px-2.5 py-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 text-[10px] transition flex items-center justify-center gap-1 cursor-pointer"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          <span>حذف حساب الموظف نهائياً</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
 
       {/* SubTab 1: Employees Timeline */}
       {activeSubTab === 'TIMELINE' && (
@@ -874,6 +1428,363 @@ export const AdminMonitorView: React.FC<AdminMonitorViewProps> = ({
                 تأكيد دمج السجلات
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 1: Edit Permissions Matrix and User Account */}
+      {editingUserForPermissions && editPermissionsForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-xs overflow-y-auto">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-3xl w-full max-h-[92vh] flex flex-col border border-slate-200 dark:border-slate-800 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-900/80 rounded-t-2xl">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-orange-100 dark:bg-orange-950/80 text-orange-600 dark:text-orange-400 rounded-xl">
+                  <ShieldCheck className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <span>تخصيص مصفوفة الصلاحيات والحساب</span>
+                    <span className="text-xs px-2 py-0.5 rounded-md bg-orange-100 dark:bg-orange-950 text-orange-700 dark:text-orange-300 font-mono">
+                      @{editingUserForPermissions.username}
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    التحكم الدقيق بـ 15 مستوى صلاحية تشغيلية ومحاسبية وإدارية للموظف: {editingUserForPermissions.fullName}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingUserForPermissions(null)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-white p-1.5 rounded-lg transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body (Scrollable) */}
+            <div className="p-4 sm:p-6 overflow-y-auto space-y-6 flex-1 text-right" dir="rtl">
+              {/* Basic Info Bar */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50 dark:bg-slate-850 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                    الاسم الكامل للموظف
+                  </label>
+                  <input
+                    type="text"
+                    value={editUserFullName}
+                    onChange={e => setEditUserFullName(e.target.value)}
+                    className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-orange-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                    رقم الهاتف والتواصل
+                  </label>
+                  <input
+                    type="text"
+                    value={editUserPhone}
+                    onChange={e => setEditUserPhone(e.target.value)}
+                    placeholder="77XXXXXXX"
+                    className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-orange-500"
+                    dir="ltr"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                    الدور المعتمد
+                  </label>
+                  <select
+                    value={editUserRole}
+                    onChange={e => setEditUserRole(e.target.value as UserRole)}
+                    disabled={editingUserForPermissions.role === 'SUPER_ADMIN'}
+                    className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-orange-500"
+                  >
+                    <option value="SUPER_ADMIN">المالك / مدير عام</option>
+                    <option value="COMPANY_MANAGER">مدير الشركة</option>
+                    <option value="OPERATIONS">مدير العمليات</option>
+                    <option value="ACCOUNTANT">محاسب مالي</option>
+                    <option value="CASHIER">أمين الصندوق</option>
+                    <option value="AUDITOR">مدقق حسابات</option>
+                    <option value="VIEWER">مستعرض اطلاع</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Presets and Bulk Actions */}
+              <div className="flex items-center justify-between flex-wrap gap-2 pt-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">إجراءات سريعة:</span>
+                  <button
+                    type="button"
+                    onClick={handleGrantAllPermissions}
+                    className="px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
+                  >
+                    <CheckSquare className="w-3.5 h-3.5" />
+                    <span>منح الكل (15)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleResetToRoleDefaults}
+                    className="px-2.5 py-1 bg-sky-50 dark:bg-sky-950/60 hover:bg-sky-100 text-sky-700 dark:text-sky-300 border border-sky-300 dark:border-sky-800 rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>افتراضي الدور</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleRevokeAllPermissions}
+                    className="px-2.5 py-1 bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800 rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
+                  >
+                    <Square className="w-3.5 h-3.5" />
+                    <span>إلغاء الكل (0)</span>
+                  </button>
+                </div>
+
+                <div className="text-xs font-bold text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/40 px-3 py-1 rounded-lg border border-orange-200 dark:border-orange-800">
+                  {Object.values(editPermissionsForm).filter(Boolean).length} من أصل 15 صلاحية مفعلة
+                </div>
+              </div>
+
+              {/* Categorized Permissions Grid */}
+              {(['عام', 'العمليات', 'الأسطول', 'المالية', 'الرقابة', 'التقارير', 'الإدارة'] as const).map(categoryName => {
+                const groupItems = PERMISSION_DEFINITIONS.filter(p => p.category === categoryName);
+                if (groupItems.length === 0) return null;
+
+                return (
+                  <div key={categoryName} className="space-y-2.5">
+                    <div className="flex items-center gap-2 pb-1 border-b border-slate-200 dark:border-slate-800">
+                      <Layers className="w-4 h-4 text-orange-500" />
+                      <h4 className="text-xs font-black text-slate-800 dark:text-slate-200">
+                        {categoryName === 'عام' ? 'لوحة المعلومات والمؤشرات العامة' :
+                         categoryName === 'العمليات' ? 'إدارة العمليات والرحلات والعملاء' :
+                         categoryName === 'الأسطول' ? 'إدارة الأسطول والشاحنات والسائقين والصيانة' :
+                         categoryName === 'المالية' ? 'الإدارة المالية، السندات، وإقفال الصندوق' :
+                         categoryName === 'الرقابة' ? 'الرقابة، الاعتمادات، والمزامنة المركزية' :
+                         categoryName === 'التقارير' ? 'التقارير واستخراج وطباعة البيانات' : 'إدارة النظام والأمان والنسخ الاحتياطي'}
+                      </h4>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                      {groupItems.map(item => {
+                        const isGranted = Boolean(editPermissionsForm[item.key]);
+
+                        return (
+                          <div
+                            key={item.key}
+                            onClick={() => handleTogglePermission(item.key)}
+                            className={`p-3 rounded-xl border transition cursor-pointer select-none flex items-start gap-3 ${
+                              isGranted
+                                ? 'bg-orange-50/60 dark:bg-orange-950/20 border-orange-300 dark:border-orange-800/80 shadow-2xs'
+                                : 'bg-slate-50/50 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800 opacity-70 hover:opacity-100'
+                            }`}
+                          >
+                            <div className="pt-0.5 shrink-0">
+                              <input
+                                type="checkbox"
+                                checked={isGranted}
+                                onChange={() => handleTogglePermission(item.key)}
+                                className="w-4 h-4 accent-orange-500 rounded cursor-pointer"
+                              />
+                            </div>
+                            <div className="space-y-0.5 text-right flex-1">
+                              <div className={`text-xs font-bold leading-tight ${
+                                isGranted ? 'text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-400'
+                              }`}>
+                                {item.label}
+                              </div>
+                              <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                                {item.desc}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 sm:p-5 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80 flex items-center justify-between rounded-b-2xl">
+              <button
+                type="button"
+                onClick={() => setEditingUserForPermissions(null)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold transition cursor-pointer"
+              >
+                إلغاء
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveUserPermissions}
+                className="px-6 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-xl text-xs font-bold transition shadow-md flex items-center gap-2 cursor-pointer"
+              >
+                <Save className="w-4 h-4" />
+                <span>حفظ مصفوفة الصلاحيات</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 2: Add New User */}
+      {showAddUserModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-xs">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full p-5 sm:p-6 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150 text-right" dir="rtl">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-orange-100 dark:bg-orange-950 text-orange-600 dark:text-orange-400 rounded-xl">
+                  <UserPlus className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">إضافة موظف ومستخدم جديد</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">إنشاء حساب نظام وتعيين الدور والصلاحيات الفورية</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAddUserModal(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateUser} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  الاسم الكامل للموظف <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newFullName}
+                  onChange={e => setNewFullName(e.target.value)}
+                  placeholder="مثال: م. أحمد صالح العمري"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-orange-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    اسم المستخدم للدخول <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newUsername}
+                    onChange={e => setNewUsername(e.target.value)}
+                    placeholder="ahmed"
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-orange-500 font-mono text-left"
+                    dir="ltr"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    المسمى الوظيفي والدور <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    value={newRole}
+                    onChange={e => setNewRole(e.target.value as UserRole)}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-orange-500"
+                  >
+                    <option value="OPERATIONS">مدير العمليات والتشغيل</option>
+                    <option value="ACCOUNTANT">المحاسب المالي</option>
+                    <option value="CASHIER">أمين الصندوق والتحصيل</option>
+                    <option value="AUDITOR">المراجع والمدقق</option>
+                    <option value="COMPANY_MANAGER">مدير الشركة</option>
+                    <option value="VIEWER">مستعرض اطلاع فقط</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  رقم الهاتف (للتواصل وإرسال البيانات)
+                </label>
+                <input
+                  type="text"
+                  value={newPhone}
+                  onChange={e => setNewPhone(e.target.value)}
+                  placeholder="77XXXXXXX"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-orange-500 font-mono text-left"
+                  dir="ltr"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    كلمة المرور المؤقتة المقترحة
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setNewTempPass(generateTemporaryPassword())}
+                      className="text-[10px] text-orange-600 dark:text-orange-400 hover:underline flex items-center gap-1 cursor-pointer"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                      <span>توليد أخرى</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyPassword(newTempPass)}
+                      className="text-[10px] text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
+                    >
+                      <Copy className="w-3 h-3" />
+                      <span>{copiedPassText === newTempPass ? 'تم النسخ!' : 'نسخ'}</span>
+                    </button>
+                  </div>
+                </div>
+                <input
+                  type="text"
+                  value={newTempPass}
+                  onChange={e => setNewTempPass(e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-3.5 py-2 text-xs font-mono font-bold text-orange-600 dark:text-orange-400 focus:outline-none focus:border-orange-500 text-left"
+                  dir="ltr"
+                />
+              </div>
+
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700/60 flex items-center gap-2.5">
+                <input
+                  type="checkbox"
+                  id="forceChangeCheck"
+                  checked={forceFirstChange}
+                  onChange={e => setForceFirstChange(e.target.checked)}
+                  className="w-4 h-4 accent-orange-500 rounded cursor-pointer"
+                />
+                <label htmlFor="forceChangeCheck" className="text-xs text-slate-700 dark:text-slate-300 select-none cursor-pointer">
+                  إلزام الموظف بتغيير كلمة المرور الشخصية فور تسجيل دخوله الأول
+                </label>
+              </div>
+
+              <div className="text-[11px] text-slate-500 dark:text-slate-400 bg-amber-50 dark:bg-amber-950/30 p-2.5 rounded-xl border border-amber-200 dark:border-amber-900/60">
+                ملاحظة: سيتم منح هذا الحساب حزمة الصلاحيات الافتراضية الموصى بها للدور المختار، ويمكنك تخصيص وتعديل أي من الصلاحيات الـ 15 لاحقاً بكل سهولة.
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowAddUserModal(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold transition cursor-pointer"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-xl text-xs font-bold transition shadow-md flex items-center gap-1.5 cursor-pointer"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  <span>تأكيد إنشاء الحساب</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

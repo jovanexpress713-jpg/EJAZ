@@ -56,11 +56,16 @@ export const NetworkStatusIndicator: React.FC<NetworkStatusIndicatorProps> = ({ 
       setIsOnline(false);
       return;
     }
+    const baseUrl = ApiClient.getBaseUrl();
+    if (window.location.protocol === 'file:' && !baseUrl) {
+      setIsOnline(false);
+      return;
+    }
     const start = performance.now();
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 3000);
-      const res = await fetch('/api/sync/status', { signal: controller.signal });
+      const res = await fetch((baseUrl || '') + '/api/sync/status', { signal: controller.signal });
       clearTimeout(timeoutId);
       const latency = Math.round(performance.now() - start);
       if (res.ok) {

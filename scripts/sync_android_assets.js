@@ -50,5 +50,8 @@ if (fs.existsSync('public/icon.png')) {
 if (fs.existsSync('public/apple-touch-icon.png')) {
   fs.copyFileSync('public/apple-touch-icon.png', path.join(wwwDir, 'apple-touch-icon.png'));
 }
+if (fs.existsSync('public/favicon.png')) {
+  fs.copyFileSync('public/favicon.png', path.join(wwwDir, 'favicon.png'));
+}
 
 console.log('✅ Successfully synced compiled web assets to app/src/main/assets/www/');

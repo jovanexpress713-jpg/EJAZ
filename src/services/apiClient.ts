@@ -46,9 +46,33 @@ export class ApiClient {
     }
   }
 
+  public static getBaseUrl(): string {
+    if (typeof window !== 'undefined') {
+      if (window.location.protocol === 'file:') {
+        try {
+          const raw = localStorage.getItem('ejaz_clean_settings_v5');
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed.serverUrl) return String(parsed.serverUrl).replace(/\/+$/, '');
+          }
+        } catch {
+          // safe ignore
+        }
+        return '';
+      }
+    }
+    return '';
+  }
+
   public static async isOnline(): Promise<boolean> {
     if (typeof window === 'undefined') return true;
     if (!navigator.onLine) {
+      this.isServerOnline = false;
+      return false;
+    }
+
+    // In file:/// protocol without configured server URL, APK is offline-standalone
+    if (window.location.protocol === 'file:' && !this.getBaseUrl()) {
       this.isServerOnline = false;
       return false;
     }
@@ -62,7 +86,8 @@ export class ApiClient {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 2500);
-      const res = await fetch('/api/sync/status', { signal: controller.signal });
+      const targetUrl = (this.getBaseUrl() || '') + '/api/sync/status';
+      const res = await fetch(targetUrl, { signal: controller.signal });
       clearTimeout(timeoutId);
       this.isServerOnline = res.ok;
       this.lastCheckTime = now;
@@ -86,7 +111,8 @@ export class ApiClient {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const res = await fetch(endpoint, {
+    const targetUrl = (this.getBaseUrl() || '') + endpoint;
+    const res = await fetch(targetUrl, {
       ...options,
       headers,
     });

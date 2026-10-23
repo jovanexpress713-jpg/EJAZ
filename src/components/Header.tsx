@@ -131,10 +131,8 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Target Selector 1: header > div container */}
       <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-6 h-16 sm:h-18 flex items-center justify-between gap-2 sm:gap-4 relative" dir="rtl">
         
-        {/* RIGHT GROUP: 1. الشعار, 2. زر الوضع الليلي/النهاري, 3. زر الإشعارات */}
+        {/* RIGHT GROUP: 1. الشعار الرسمي لمؤسسة إيجاز للنقليات */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          
-          {/* 1. شعار إيجاز للنقليات EJAZ TRANSPORT */}
           <button 
             type="button"
             onClick={() => handleTabChange('DASHBOARD')}
@@ -143,11 +141,12 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <EjazLogo size="sm" variant={theme === 'dark' ? 'white' : 'dark'} />
           </button>
+        </div>
 
-          {/* Vertical Separator */}
-          <div className="h-6 w-px bg-slate-200 dark:bg-slate-800 shrink-0 hidden sm:block" />
-
-          {/* 2. زر التبديل بين الوضع الليلي والنهاري */}
+        {/* LEFT GROUP: زر الوضع الليلي/النهاري، زر الإشعارات، وحساب مدير النظام */}
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          
+          {/* زر التبديل بين الوضع الليلي والنهاري */}
           {onToggleTheme && (
             <button
               id="header-theme-toggle-btn"
@@ -178,7 +177,7 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
 
-          {/* 3. زر الإشعارات والتنبيهات مع شارة العدد عند وجود إشعارات غير مقروءة */}
+          {/* زر الإشعارات والتنبيهات مع شارة العدد عند وجود إشعارات غير مقروءة */}
           <div className="relative shrink-0" ref={notificationsRef}>
             <button
               id="header-notifications-btn"
@@ -199,7 +198,7 @@ export const Header: React.FC<HeaderProps> = ({
             {showNotificationsDropdown && (
               <div 
                 id="notifications-dropdown-menu"
-                className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-150"
+                className="absolute left-0 mt-2 w-80 sm:w-96 bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-150"
                 dir="rtl"
               >
                 <div className="p-3.5 bg-[#070E1E] text-white flex items-center justify-between border-b border-slate-800">
@@ -261,11 +260,10 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
             )}
           </div>
-        </div>
 
-        {/* LEFT GROUP: حساب المالك أو مدير النظام (يضم الخادم والصلاحيات والإعدادات وتسجيل الخروج) */}
-        <div className="flex items-center gap-2 shrink-0">
-          
+          {/* Vertical Separator */}
+          <div className="h-6 w-px bg-slate-200 dark:bg-slate-800 shrink-0 hidden sm:block" />
+
           {/* حساب المالك أو مدير النظام مع القائمة المنبثقة المتكاملة */}
           <div className="relative shrink-0" ref={accountMenuRef}>
             <button

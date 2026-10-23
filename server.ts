@@ -20,7 +20,7 @@ const __dirname = path.dirname(__filename);
 
 async function startServer() {
   const app = express();
-  const PORT = Number(process.env.PORT) || 3000;
+  const PORT = 3000;
   const isProduction = process.env.NODE_ENV === 'production';
 
   // Initialize central database
@@ -76,7 +76,7 @@ async function startServer() {
   });
 
   // Client Application Serving
-  if (isProduction || fs.existsSync(path.resolve(__dirname, 'dist/index.html'))) {
+  if (isProduction && fs.existsSync(path.resolve(__dirname, 'dist/index.html'))) {
     const distPath = path.resolve(__dirname, 'dist');
     app.use(express.static(distPath));
     app.get('*', (req: Request, res: Response) => {
@@ -90,6 +90,18 @@ async function startServer() {
       appType: 'spa',
     });
     app.use(vite.middlewares);
+    app.use('*', async (req: Request, res: Response, next: NextFunction) => {
+      if (req.method !== 'GET') return next();
+      const url = req.originalUrl;
+      try {
+        let template = fs.readFileSync(path.resolve(__dirname, 'index.html'), 'utf-8');
+        template = await vite.transformIndexHtml(url, template);
+        res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
+      } catch (e) {
+        if (e instanceof Error) vite.ssrFixStacktrace(e);
+        next(e);
+      }
+    });
   }
 
   app.listen(PORT, '0.0.0.0', () => {
