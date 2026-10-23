@@ -569,7 +569,7 @@ export class StorageService {
   }
 
   static getCurrentUser(): User | null {
-    return getItem(STORAGE_KEYS.CURRENT_USER, DEFAULT_USERS[0]);
+    return getItem<User | null>(STORAGE_KEYS.CURRENT_USER, null);
   }
 
   static setCurrentUser(user: User | null): void {
@@ -581,7 +581,7 @@ export class StorageService {
       if (prevUser) {
         this.addAuditLog(prevUser, 'LOGOUT', 'User', prevUser.id, `تسجيل خروج المستخدم ${prevUser.fullName}`);
       }
-      removeItem(STORAGE_KEYS.CURRENT_USER);
+      setItem(STORAGE_KEYS.CURRENT_USER, null, false);
     }
   }
 
