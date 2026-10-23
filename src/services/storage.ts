@@ -33,7 +33,7 @@ import { createImmutableTripSnapshot } from './driverTrackingLedger';
 import { generateTripUniqueKey } from '../utils/uniqueKeyService';
 import { isExactTruckMatch, normalizeTruckNumber } from '../utils/truckUtils';
 import { SyncEngine } from './syncEngine';
-import { generateSalt } from './security';
+import { generateSalt, hashPasswordWithSalt } from './security';
 
 export function getDefaultPermissions(role: UserRole): UserPermissions {
   switch (role) {
@@ -646,20 +646,25 @@ export class StorageService {
   }
 
   // User changes own password
-  static changeUserPassword(userId: string, newPass: string): void {
+  static async changeUserPassword(userId: string, newPass: string): Promise<void> {
     const users = this.getUsers();
     const user = users.find(u => u.id === userId);
     if (!user) throw new Error('المستخدم غير موجود.');
 
-    user.password = newPass;
+    const passwordSalt = generateSalt();
+    const passwordHash = await hashPasswordWithSalt(newPass, passwordSalt);
+    delete user.password;
+    user.passwordSalt = passwordSalt;
+    user.passwordHash = passwordHash;
     user.mustChangePassword = false;
-    user.passwordSalt = generateSalt();
     setItem(STORAGE_KEYS.USERS, users);
 
     // If current logged-in user, update session as well
     const current = this.getCurrentUser();
     if (current && current.id === userId) {
-      this.setCurrentUser({ ...current, password: newPass, mustChangePassword: false });
+      const updatedCurrent = { ...current, passwordSalt, passwordHash, mustChangePassword: false };
+      delete updatedCurrent.password;
+      this.setCurrentUser(updatedCurrent);
     }
 
     this.addAuditLog(
