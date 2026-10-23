@@ -22,7 +22,6 @@ import {
 
 const TOKEN_KEY = 'ejaz_auth_token_v1';
 const SERVER_URL_KEY = 'ejaz_central_server_url_v1';
-const SERVER_URL_KEY = 'ejaz_central_server_url_v1';
 
 export class ApiClient {
   private static cachedToken: string | null = null;
