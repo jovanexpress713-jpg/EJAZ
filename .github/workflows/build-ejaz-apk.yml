@@ -106,7 +106,27 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: 13. Create GitHub Release with APK on main push
+      - name: 13. Package local central server for handoff
+        run: |
+          SERVER_ZIP="$PWD/VICTORIA-Logistics-ERP-Central-Server-v1.2.0.zip"
+          zip -r "$SERVER_ZIP" . \
+            -x "./.git/*" \
+               "./node_modules/*" \
+               "./app/build/*" \
+               "./data/*" \
+               "./.env"
+          test -s "$SERVER_ZIP"
+          echo "Central server package created: $SERVER_ZIP"
+
+      - name: 14. Upload local central server package
+        uses: actions/upload-artifact@v4
+        with:
+          name: VICTORIA-Logistics-ERP-Central-Server-v1.2.0
+          path: VICTORIA-Logistics-ERP-Central-Server-v1.2.0.zip
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: 15. Create GitHub Release with APK on main push
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
