@@ -21,6 +21,7 @@ import {
 } from '../types';
 
 const TOKEN_KEY = 'ejaz_auth_token_v1';
+const SERVER_URL_KEY = 'ejaz_central_server_url_v1';
 
 export class ApiClient {
   private static cachedToken: string | null = null;
@@ -47,21 +48,36 @@ export class ApiClient {
   }
 
   public static getBaseUrl(): string {
-    if (typeof window !== 'undefined') {
-      if (window.location.protocol === 'file:') {
-        try {
-          const raw = localStorage.getItem('ejaz_clean_settings_v5');
-          if (raw) {
-            const parsed = JSON.parse(raw);
-            if (parsed.serverUrl) return String(parsed.serverUrl).replace(/\/+$/, '');
-          }
-        } catch {
-          // safe ignore
-        }
-        return '';
+    if (typeof window === 'undefined') return '';
+    try {
+      const configured = localStorage.getItem(SERVER_URL_KEY);
+      if (configured && /^https?:\/\//i.test(configured.trim())) {
+        return configured.trim().replace(/\/+$/, '');
       }
+      const raw = localStorage.getItem('ejaz_clean_settings_v5');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const nestedUrl = parsed?.syncConfig?.serverUrl || parsed?.serverUrl;
+        if (nestedUrl && /^https?:\/\//i.test(String(nestedUrl).trim())) {
+          return String(nestedUrl).trim().replace(/\/+$/, '');
+        }
+      }
+    } catch {
+      // Invalid local configuration is ignored; same-origin web mode remains available.
     }
-    return '';
+    return window.location.protocol === 'file:' ? '' : window.location.origin;
+  }
+
+  public static setBaseUrl(url: string): void {
+    if (typeof window === 'undefined') return;
+    const normalized = url.trim().replace(/\/+$/, '');
+    if (normalized && !/^https?:\/\//i.test(normalized)) {
+      throw new Error('رابط الخادم يجب أن يبدأ بـ http:// أو https://');
+    }
+    if (normalized) localStorage.setItem(SERVER_URL_KEY, normalized);
+    else localStorage.removeItem(SERVER_URL_KEY);
+    this.lastCheckTime = 0;
+    this.isServerOnline = false;
   }
 
   public static async isOnline(): Promise<boolean> {
