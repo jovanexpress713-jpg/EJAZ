@@ -85,6 +85,9 @@ syncRouter.post('/push', authenticate, (req: AuthenticatedRequest, res: Response
 
     items.forEach((item: SyncOutboxItem) => {
       if (!item.entityType || !item.entityId) return;
+      // User accounts and company-wide settings require elevated privileges.
+      if (item.entityType === 'USER' && req.user?.role !== 'SUPER_ADMIN') return;
+      if (item.entityType === 'SETTINGS' && req.user?.role !== 'SUPER_ADMIN' && !req.user?.permissions?.canManageSettings) return;
 
       const actorName = req.user?.fullName || item.authorName || 'مستخدم متزامن';
       const actorId = req.user?.id || item.authorId || 'sync_device';
@@ -228,8 +231,8 @@ syncRouter.post('/push', authenticate, (req: AuthenticatedRequest, res: Response
                 created.passwordHash = hashPassword(created.password, salt);
               }
               delete created.password;
-              if (!created.passwordHash || !created.passwordSalt) {
-                // Never create a central account with unverifiable credentials.
+              if (!incoming.password || !created.passwordHash || !created.passwordSalt) {
+                // Never create a central account without a server-verifiable password.
                 break;
               }
               db.users.push(created);
