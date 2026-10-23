@@ -119,6 +119,7 @@ export const FirstRunSetupModal: React.FC<FirstRunSetupModalProps> = ({
       }
 
       // Save local cache only after the central server accepted owner setup.
+      owner.id = centralOwner.id;
       StorageService.saveUser(owner);
       StorageService.setCurrentUser(centralOwner || owner);
 
