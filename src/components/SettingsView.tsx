@@ -194,6 +194,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [centralServerUrl, setCentralServerUrl] = useState(() => ApiClient.getBaseUrl());
   const [centralServerStatus, setCentralServerStatus] = useState<'UNKNOWN' | 'CHECKING' | 'CONNECTED' | 'OFFLINE'>('UNKNOWN');
   const [centralServerMessage, setCentralServerMessage] = useState('');
+  const [centralSetupKey, setCentralSetupKey] = useState('');
+  const [centralOwnerPassword, setCentralOwnerPassword] = useState('');
   const [activeTab, setActiveTab] = useState<'COMPANY' | 'ROLES' | 'AUDIT' | 'BACKUP' | 'CENTRAL_SERVER' | 'SYSTEM_INFO'>('COMPANY');
   const [copiedPhone, setCopiedPhone] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -2253,6 +2255,45 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 {centralServerStatus === 'CHECKING' ? 'جارٍ الاختبار… ' : centralServerStatus === 'CONNECTED' ? 'متصل فعليًا: ' : centralServerStatus === 'OFFLINE' ? 'غير متصل: ' : ''}{centralServerMessage}
               </div>
             )}
+            <div className="border-t border-slate-200 pt-4 space-y-3">
+              <h4 className="font-bold text-slate-900 text-sm">إعداد حساب المالك على الخادم (للتثبيت الموجود مسبقًا)</h4>
+              <p className="text-xs text-slate-600 leading-5">استخدم هذا القسم مرة واحدة فقط إذا كان لديك حساب محلي قديم وتحتاج إلى إنشاء الحساب المركزي. إذا تم إنشاء المالك المركزي سابقًا فلن يسمح الخادم بإعادة تهيئته.</p>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">مفتاح التهيئة لمرة واحدة</label>
+                <input type="password" autoComplete="off" value={centralSetupKey} onChange={e => setCentralSetupKey(e.target.value)} className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm" placeholder="المفتاح المحفوظ من إعداد الخادم" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">كلمة مرور الحساب المركزي</label>
+                <input type="password" autoComplete="new-password" value={centralOwnerPassword} onChange={e => setCentralOwnerPassword(e.target.value)} className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm" placeholder="5 خانات على الأقل" />
+              </div>
+              <button type="button" onClick={async () => {
+                if (!centralServerUrl.trim() || !centralSetupKey.trim() || centralOwnerPassword.length < 5) {
+                  setCentralServerStatus('OFFLINE');
+                  setCentralServerMessage('أدخل عنوان الخادم ومفتاح التهيئة وكلمة مرور من 5 خانات على الأقل.');
+                  return;
+                }
+                try {
+                  ApiClient.setBaseUrl(centralServerUrl);
+                  const result = await ApiClient.setupOwner({
+                    fullName: currentUser.fullName,
+                    username: currentUser.username,
+                    phone: currentUser.phone || '',
+                    password: centralOwnerPassword,
+                    setupKey: centralSetupKey,
+                  });
+                  setCentralOwnerPassword('');
+                  setCentralSetupKey('');
+                  setCentralServerStatus('CONNECTED');
+                  setCentralServerMessage('تم إنشاء حساب المالك المركزي. سجّل الخروج ثم ادخل مجددًا باستخدام كلمة المرور التي أدخلتها هنا.');
+                } catch (error: any) {
+                  setCentralServerStatus('OFFLINE');
+                  setCentralServerMessage(error?.message || 'تعذر تهيئة حساب المالك المركزي.');
+                }
+              }} className="px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-bold">
+                تهيئة حساب المالك المركزي
+              </button>
+            </div>
+
             <div className="border-t border-slate-200 pt-4">
               <h4 className="font-bold text-slate-900 text-sm mb-2">متطلبات تشغيل الخادم المحلي</h4>
               <ul className="list-disc pr-5 text-xs text-slate-600 space-y-1.5 leading-6">
