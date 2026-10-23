@@ -27,6 +27,7 @@ export const FirstRunSetupModal: React.FC<FirstRunSetupModalProps> = ({
   const [username, setUsername] = useState('admin');
   const [phone, setPhone] = useState('');
   const [setupKey, setSetupKey] = useState('');
+  const [serverUrl, setServerUrl] = useState(() => ApiClient.getBaseUrl());
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [recoveryKey, setRecoveryKey] = useState<string>(() => generateRecoveryKey());
@@ -52,6 +53,14 @@ export const FirstRunSetupModal: React.FC<FirstRunSetupModalProps> = ({
     }
     if (password.length < 5) {
       setErrorMsg('كلمة المرور يجب أن لا تقل عن 5 خانات.');
+      return;
+    }
+    if (!serverUrl.trim()) {
+      setErrorMsg('أدخل رابط الخادم المركزي المحلي أولاً، مثل http://192.168.1.10:3000');
+      return;
+    }
+    if (!setupKey.trim()) {
+      setErrorMsg('أدخل مفتاح تهيئة الخادم الذي تم إنشاؤه على جهاز الخادم.');
       return;
     }
     if (password !== confirmPassword) {
@@ -92,17 +101,26 @@ export const FirstRunSetupModal: React.FC<FirstRunSetupModalProps> = ({
         };
       }
 
-      StorageService.saveUser(owner);
-      StorageService.setCurrentUser(owner);
+      // Configure the local central server before the first privileged setup request.
+      ApiClient.setBaseUrl(serverUrl);
+      let centralOwner: User;
+      try {
+        const serverResult = await ApiClient.setupOwner({
+          fullName: fullName.trim(),
+          username: username.trim().toLowerCase(),
+          phone: phone.trim(),
+          password,
+          setupKey: setupKey.trim(),
+        });
+        centralOwner = serverResult.user;
+      } catch (serverErr: any) {
+        setErrorMsg(serverErr?.message || 'تعذر إنشاء حساب المالك على الخادم المركزي. تحقق من الرابط ومفتاح التهيئة.');
+        return;
+      }
 
-      // Also sync to central server if online
-      ApiClient.setupOwner({
-        fullName: fullName.trim(),
-        username: username.trim().toLowerCase(),
-        phone: phone.trim(),
-        password,
-        setupKey: setupKey.trim(),
-      }).catch(err => console.warn('Server owner sync note:', err));
+      // Save local cache only after the central server accepted owner setup.
+      StorageService.saveUser(owner);
+      StorageService.setCurrentUser(centralOwner || owner);
 
       // Also update settings owner phone
       const settings = StorageService.getSettings();
@@ -160,14 +178,30 @@ export const FirstRunSetupModal: React.FC<FirstRunSetupModalProps> = ({
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  مفتاح تهيئة الخادم المركزي (إذا كان مربوطًا)
+                  رابط الخادم المركزي المحلي (على نفس شبكة Wi-Fi)
+                </label>
+                <input
+                  type="url"
+                  required
+                  value={serverUrl}
+                  onChange={e => setServerUrl(e.target.value)}
+                  placeholder="http://192.168.1.10:3000"
+                  dir="ltr"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-orange-500"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">أدخل عنوان الكمبيوتر الذي سيعمل كخادم دائم داخل المؤسسة.</p>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  مفتاح تهيئة الخادم لمرة واحدة
                 </label>
                 <input
                   type="password"
+                  required
                   autoComplete="off"
                   value={setupKey}
                   onChange={e => setSetupKey(e.target.value)}
-                  placeholder="يُترك فارغًا في وضع العمل المحلي"
+                  placeholder="المفتاح الذي أنشأه برنامج إعداد الخادم"
                   className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-orange-500"
                 />
               </div>
