@@ -42,6 +42,7 @@ import { AboutSystemModal } from './components/AboutSystemModal';
 import { MobileSavePointsModal } from './components/MobileSavePointsModal';
 import { DailyHandoverModal } from './components/DailyHandoverModal';
 import { Phone } from 'lucide-react';
+import { EjazAssistant } from './components/EjazAssistant';
 
 export default function App() {
   // App Stage: 'SPLASH' | 'LOGIN' | 'MAIN'
@@ -522,6 +523,17 @@ export default function App() {
           </div>
         </div>
       </footer>
+
+      {/* Contextual in-app guide. This is a rule-based helper, not an external AI service. */}
+      <EjazAssistant
+        trips={trips}
+        customers={customers}
+        drivers={drivers}
+        trucks={trucks}
+        expenses={expenses}
+        collections={collections}
+        onNavigate={handleNavigate}
+      />
 
       {/* About System & Development Rights Modal */}
       <AboutSystemModal
