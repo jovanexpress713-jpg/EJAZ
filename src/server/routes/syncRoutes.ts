@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import { Database } from '../database';
-import { authenticate, optionalAuthenticate, AuthenticatedRequest } from '../auth';
+import { authenticate, optionalAuthenticate, AuthenticatedRequest, hashPassword, generateSalt } from '../auth';
 import { SyncOutboxItem, AuditLog } from '../../types';
 
 export const syncRouter = Router();
@@ -195,6 +195,55 @@ syncRouter.post('/push', authenticate, (req: AuthenticatedRequest, res: Response
             }
           }
           appliedIds.push(item.id);
+          break;
+        }
+
+        case 'USER': {
+          const incoming = item.payload as any;
+          const existingIdx = db.users.findIndex(u => u.id === item.entityId);
+          if (item.action === 'DELETE') {
+            const target = existingIdx >= 0 ? db.users[existingIdx] : undefined;
+            if (target && target.role !== 'SUPER_ADMIN') db.users.splice(existingIdx, 1);
+          } else if (incoming && incoming.role !== 'SUPER_ADMIN' && incoming.id) {
+            if (existingIdx >= 0) {
+              const existing = db.users[existingIdx];
+              const updated: any = { ...existing, ...incoming };
+              // Keep server credentials unless a new plaintext temporary password is supplied.
+              if (incoming.password) {
+                const salt = generateSalt();
+                updated.passwordSalt = salt;
+                updated.passwordHash = hashPassword(incoming.password, salt);
+              }
+              delete updated.password;
+              if (!incoming.password) {
+                updated.passwordHash = existing.passwordHash;
+                updated.passwordSalt = existing.passwordSalt;
+              }
+              db.users[existingIdx] = updated;
+            } else {
+              const created: any = { ...incoming };
+              if (created.password) {
+                const salt = generateSalt();
+                created.passwordSalt = salt;
+                created.passwordHash = hashPassword(created.password, salt);
+              }
+              delete created.password;
+              if (!created.passwordHash || !created.passwordSalt) {
+                // Never create a central account with unverifiable credentials.
+                break;
+              }
+              db.users.push(created);
+            }
+            appliedIds.push(item.id);
+          }
+          break;
+        }
+
+        case 'SETTINGS': {
+          if (item.action !== 'DELETE' && item.payload && typeof item.payload === 'object') {
+            db.settings = { ...db.settings, ...item.payload };
+            appliedIds.push(item.id);
+          }
           break;
         }
 
