@@ -22,10 +22,25 @@ export const EjazAssistant: React.FC<Props> = ({ trips, customers, drivers, truc
   ]);
 
   const stats = useMemo(() => {
+    const localNow = new Date();
+    const today = `${localNow.getFullYear()}-${String(localNow.getMonth() + 1).padStart(2, '0')}-${String(localNow.getDate()).padStart(2, '0')}`;
     const revenue = trips.reduce((s, t) => s + Number(t.totalAmount || 0), 0);
     const collected = collections.reduce((s, c) => s + Number(c.amount || 0), 0);
     const expensesTotal = expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
-    return { revenue, collected, expensesTotal, remaining: Math.max(0, revenue - collected), profit: revenue - expensesTotal };
+    const tripExpenses = trips.reduce((s, t) => s + Number(t.tripExpenses || 0), 0);
+    const remaining = trips.reduce((s, t) => s + Number(t.remainingAmount ?? Math.max(0, Number(t.totalAmount || 0) - Number(t.paidAmount || 0))), 0);
+    const todayTrips = trips.filter(t => t.date === today);
+    const collectedToday = collections.filter(c => c.date === today).reduce((s, c) => s + Number(c.amount || 0), 0);
+    const expensesToday = expenses.filter(e => e.date === today).reduce((s, e) => s + Number(e.amount || 0), 0);
+    const revenueToday = todayTrips.reduce((s, t) => s + Number(t.totalAmount || 0), 0);
+    const remainingToday = todayTrips.reduce((s, t) => s + Number(t.remainingAmount ?? Math.max(0, Number(t.totalAmount || 0) - Number(t.paidAmount || 0))), 0);
+    const tripExpensesToday = todayTrips.reduce((s, t) => s + Number(t.tripExpenses || 0), 0);
+    return {
+      revenue, collected, expensesTotal, remaining,
+      profit: revenue - expensesTotal - tripExpenses,
+      revenueToday, collectedToday, expensesToday, remainingToday,
+      profitToday: revenueToday - expensesToday - tripExpensesToday,
+    };
   }, [trips, collections, expenses]);
 
   const answer = (raw: string) => {
