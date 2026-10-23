@@ -12,7 +12,7 @@ import { EjazLogo } from './EjazLogo';
 import { StorageService } from '../services/storage';
 import { SyncEngine } from '../services/syncEngine';
 import { ApiClient } from '../services/apiClient';
-import { User, UserRole } from '../types';
+import { User } from '../types';
 import { SYSTEM_INFO } from '../constants/systemInfo';
 import { AboutSystemModal } from './AboutSystemModal';
 import { ChangePasswordModal } from './ChangePasswordModal';
@@ -24,15 +24,18 @@ interface LoginScreenProps {
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onLogin }) => {
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('admin');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
   
   // Modals for first-run owner setup and temporary password change
-  const [showFirstRunModal, setShowFirstRunModal] = useState(false);
+  const [showFirstRunModal, setShowFirstRunModal] = useState(() => {
+    const owner = StorageService.getUsers().find(u => u.role === 'SUPER_ADMIN');
+    return !owner || (owner.username.toLowerCase() === 'admin' && owner.password === 'admin');
+  });
   const [userPendingPasswordChange, setUserPendingPasswordChange] = useState<User | null>(null);
 
   const handleProceedLogin = (matched: User) => {
@@ -76,8 +79,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onLogi
       // 2. Fallback to local authentication when offline
       const users = StorageService.getUsers();
       const matched = users.find(
-        u => u.username.toLowerCase() === username.trim().toLowerCase() && 
-             (u.password === password || (!u.password && password === '123456') || (u.password === 'admin' && password === 'admin'))
+        u => u.username.toLowerCase() === username.trim().toLowerCase() && u.password === password
       );
 
       if (matched) {
@@ -102,16 +104,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onLogi
     } catch (err: any) {
       setErrorMsg(err?.message || 'حدث خطأ أثناء تسجيل الدخول');
       setIsLoading(false);
-    }
-  };
-
-  const handleQuickRoleSelect = (role: UserRole) => {
-    const users = StorageService.getUsers();
-    const target = users.find(u => u.role === role);
-    if (target) {
-      setUsername(target.username);
-      setPassword(target.password || '123');
-      setErrorMsg('');
     }
   };
 
@@ -238,63 +230,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onLogi
             )}
           </button>
         </form>
-
-        {/* Quick Role Tester Bar for Enterprise Roles */}
-        <div className="mt-6 pt-5 border-t border-slate-700/60">
-          <p className="text-[11px] text-slate-400 text-center mb-2.5 font-medium">
-            اختيار حساب تجريبي سريع لاختبار الأدوار والصلاحيات:
-          </p>
-          <div className="grid grid-cols-3 gap-1.5">
-            <button
-              type="button"
-              id="role-select-admin-btn"
-              onClick={() => handleQuickRoleSelect('SUPER_ADMIN')}
-              className="px-2 py-1.5 bg-slate-900 hover:bg-slate-700/80 rounded-lg text-[11px] text-orange-300 border border-slate-700 text-center font-medium transition cursor-pointer"
-            >
-              👑 مدير النظام
-            </button>
-            <button
-              type="button"
-              id="role-select-manager-btn"
-              onClick={() => handleQuickRoleSelect('COMPANY_MANAGER')}
-              className="px-2 py-1.5 bg-slate-900 hover:bg-slate-700/80 rounded-lg text-[11px] text-amber-300 border border-slate-700 text-center font-medium transition cursor-pointer"
-            >
-              🏢 مدير الشركة
-            </button>
-            <button
-              type="button"
-              id="role-select-ops-btn"
-              onClick={() => handleQuickRoleSelect('OPERATIONS')}
-              className="px-2 py-1.5 bg-slate-900 hover:bg-slate-700/80 rounded-lg text-[11px] text-blue-300 border border-slate-700 text-center font-medium transition cursor-pointer"
-            >
-              🚛 العمليات
-            </button>
-            <button
-              type="button"
-              id="role-select-acc-btn"
-              onClick={() => handleQuickRoleSelect('ACCOUNTANT')}
-              className="px-2 py-1.5 bg-slate-900 hover:bg-slate-700/80 rounded-lg text-[11px] text-emerald-300 border border-slate-700 text-center font-medium transition cursor-pointer"
-            >
-              💰 المحاسب
-            </button>
-            <button
-              type="button"
-              id="role-select-cashier-btn"
-              onClick={() => handleQuickRoleSelect('CASHIER')}
-              className="px-2 py-1.5 bg-slate-900 hover:bg-slate-700/80 rounded-lg text-[11px] text-teal-300 border border-slate-700 text-center font-medium transition cursor-pointer"
-            >
-              🏦 أمين الصندوق
-            </button>
-            <button
-              type="button"
-              id="role-select-auditor-btn"
-              onClick={() => handleQuickRoleSelect('AUDITOR')}
-              className="px-2 py-1.5 bg-slate-900 hover:bg-slate-700/80 rounded-lg text-[11px] text-purple-300 border border-slate-700 text-center font-medium transition cursor-pointer"
-            >
-              📋 المراجع
-            </button>
-          </div>
-        </div>
 
         {/* Footer Info & Development Copyright */}
         <div className="mt-5 pt-4 border-t border-slate-700/60 text-center space-y-1.5">
