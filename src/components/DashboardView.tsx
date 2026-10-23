@@ -1,541 +1,84 @@
-import React from 'react';
-import { 
-  Truck, 
-  CheckCircle2, 
-  Clock, 
-  DollarSign, 
-  TrendingUp, 
-  Users, 
-  UserCheck, 
-  ArrowUpRight, 
-  ArrowDownLeft, 
-  AlertCircle,
-  Plus,
-  Share2,
-  Printer,
-  ChevronLeft,
-  FileText,
-  CreditCard,
-  Wrench
-} from 'lucide-react';
+import React, { useMemo } from 'react';
+import { Truck, CheckCircle2, AlertCircle, Plus, Share2, Printer, ChevronLeft, FileText, CreditCard, ArrowUpRight, ArrowDownLeft, Users, UserCheck, Wrench, Activity } from 'lucide-react';
 import { Trip, Customer, Driver, Truck as TruckType, ExpenseRecord, CollectionRecord, User, MaintenanceRecord } from '../types';
 import { printTripWaybill, shareTripViaWhatsApp } from '../utils/tripActions';
+import { AdvancedAnalytics } from './AdvancedAnalytics';
 
 export interface DashboardViewProps {
-  trips: Trip[];
-  customers: Customer[];
-  drivers: Driver[];
-  trucks: TruckType[];
-  maintenance?: MaintenanceRecord[];
-  expenses: ExpenseRecord[];
-  collections: CollectionRecord[];
-  currentUser?: User | null;
-  onNavigate?: (tab: string) => void;
-  onNavigateTab?: (tab: string) => void;
-  onViewTrip?: (trip: Trip) => void;
-  onPrintWaybill?: (trip: Trip) => void;
-  onShareWhatsApp?: (trip: Trip) => void;
-  onOpenAddTrip?: () => void;
+  trips: Trip[]; customers: Customer[]; drivers: Driver[]; trucks: TruckType[]; maintenance?: MaintenanceRecord[];
+  expenses: ExpenseRecord[]; collections: CollectionRecord[]; currentUser?: User | null;
+  onNavigate?: (tab: string) => void; onNavigateTab?: (tab: string) => void; onViewTrip?: (trip: Trip) => void;
+  onPrintWaybill?: (trip: Trip) => void; onShareWhatsApp?: (trip: Trip) => void; onOpenAddTrip?: () => void;
 }
 
+const money = (n: number) => Math.round(n || 0).toLocaleString('ar-SA');
+
 export const DashboardView: React.FC<DashboardViewProps> = ({
-  trips = [],
-  customers = [],
-  drivers = [],
-  trucks = [],
-  expenses = [],
-  collections = [],
-  currentUser,
-  onNavigate,
-  onNavigateTab,
-  onViewTrip,
-  onPrintWaybill,
-  onShareWhatsApp,
-  onOpenAddTrip,
+  trips = [], customers = [], drivers = [], trucks = [], maintenance = [], expenses = [], collections = [],
+  onNavigate, onNavigateTab, onViewTrip, onPrintWaybill, onShareWhatsApp, onOpenAddTrip,
 }) => {
-  const navigateTo = (tab: string) => {
-    const target = tab.toUpperCase();
-    if (onNavigateTab) {
-      onNavigateTab(target);
-    } else if (onNavigate) {
-      onNavigate(target);
-    }
+  const navigate = (tab: string) => (onNavigateTab || onNavigate)?.(tab.toUpperCase());
+  const totalRevenue = trips.reduce((s, t) => s + Number(t.totalAmount || 0), 0);
+  const collected = collections.reduce((s, c) => s + Number(c.amount || 0), 0);
+  const expensesTotal = expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
+  const remaining = Math.max(0, totalRevenue - collected);
+  const profit = totalRevenue - expensesTotal;
+  const completed = trips.filter(t => t.status === 'COMPLETED').length;
+  const active = trips.filter(t => !['COMPLETED', 'CANCELLED'].includes(t.status)).length;
+  const recentTrips = useMemo(() => [...trips].sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))).slice(0, 6), [trips]);
+
+  const status = (s: Trip['status']) => {
+    const map: Record<string, { label: string; cls: string }> = {
+      COMPLETED: { label: 'مكتملة', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+      IN_TRANSIT: { label: 'جارية', cls: 'bg-blue-50 text-blue-700 border-blue-200' },
+      LOADING: { label: 'تحميل', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
+      DELIVERED: { label: 'تم التوصيل', cls: 'bg-purple-50 text-purple-700 border-purple-200' },
+      CANCELLED: { label: 'ملغاة', cls: 'bg-rose-50 text-rose-700 border-rose-200' },
+    };
+    const x = map[s] || { label: 'جديدة', cls: 'bg-slate-50 text-slate-700 border-slate-200' };
+    return <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black border ${x.cls}`}><CheckCircle2 className="w-3 h-3" />{x.label}</span>;
   };
 
-  const handlePrint = (trip: Trip) => {
-    if (onPrintWaybill) {
-      onPrintWaybill(trip);
-    } else {
-      printTripWaybill(trip);
-    }
-  };
-
-  const handleWhatsApp = (trip: Trip) => {
-    if (onShareWhatsApp) {
-      onShareWhatsApp(trip);
-    } else {
-      shareTripViaWhatsApp(trip);
-    }
-  };
-
-  const handleOpenAdd = () => {
-    if (onOpenAddTrip) {
-      onOpenAddTrip();
-    } else {
-      navigateTo('TRIPS');
-    }
-  };
-
-  const handleTripClick = (trip: Trip) => {
-    if (onViewTrip) {
-      onViewTrip(trip);
-    } else {
-      navigateTo('TRIPS');
-    }
-  };
-
-  // Compute Key Metrics
-  const totalTrips = trips.length;
-  const completedTrips = trips.filter(t => t.status === 'COMPLETED').length;
-  const activeTrips = trips.filter(t => t.status !== 'COMPLETED' && t.status !== 'CANCELLED').length;
-  
-  const totalRevenues = trips.reduce((acc, t) => acc + (t.totalAmount || 0), 0);
-  const totalCollected = collections.reduce((acc, c) => acc + (c.amount || 0), 0);
-  const totalRemaining = Math.max(0, totalRevenues - totalCollected);
-  const totalExpenses = expenses.reduce((acc, e) => acc + (e.amount || 0), 0);
-  const netProfit = totalRevenues - totalExpenses;
-
-  const totalCustomers = customers.length;
-  const totalDrivers = drivers.length;
-  const totalTrucks = trucks.length;
-
-  const recentTrips = [...trips].slice(0, 6);
-
-  const getStatusBadge = (status: Trip['status']) => {
-    switch (status) {
-      case 'COMPLETED':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-            <CheckCircle2 className="w-3 h-3" /> مكتملة
-          </span>
-        );
-      case 'IN_TRANSIT':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200">
-            <Clock className="w-3 h-3 animate-spin" /> جارية على الطريق
-          </span>
-        );
-      case 'LOADING':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
-            <Clock className="w-3 h-3" /> قيد التحميل
-          </span>
-        );
-      case 'DELIVERED':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-800 border border-purple-200">
-            تم التوصيل
-          </span>
-        );
-      case 'CANCELLED':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-200">
-            ملغاة
-          </span>
-        );
-      default:
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-800 border border-slate-200">
-            جديدة
-          </span>
-        );
-    }
-  };
+  const Metric = ({ title, value, sub, icon, tone, onClick }: { title: string; value: string; sub: string; icon: React.ReactNode; tone: string; onClick: () => void }) => (
+    <button type="button" onClick={onClick} className="text-right bg-white rounded-2xl border border-slate-200 shadow-sm p-4 hover:-translate-y-0.5 hover:shadow-md transition-all cursor-pointer w-full">
+      <div className="flex items-center justify-between"><span className="text-[11px] font-bold text-slate-500">{title}</span><span className={`w-9 h-9 rounded-xl flex items-center justify-center ${tone}`}>{icon}</span></div>
+      <div className="mt-2 flex items-baseline gap-1"><span className="text-2xl font-black text-slate-900">{value}</span><span className="text-[9px] font-bold text-slate-400">ر.س</span></div>
+      <div className="mt-1 text-[10px] text-slate-400">{sub}</div>
+    </button>
+  );
 
   return (
-    <div id="ejaz-dashboard-view" className="space-y-6" dir="rtl">
-      {/* Top Banner & Quick Shortcuts */}
-      <div className="bg-[#0F172A] rounded-2xl p-4 sm:p-6 text-white shadow-lg relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div className="relative z-10 space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="bg-[#F97316] text-white text-[10px] font-bold px-2 py-0.5 rounded-md uppercase">
-              لوحة التحكم المباشرة
-            </span>
-            <span className="text-slate-400 text-xs">
-              مؤسسة إيجاز للنقليات – الرياض
-            </span>
-          </div>
-          <h1 className="text-xl sm:text-2xl font-black text-white">
-            مرحبًا بك في نظام إدارة النقل والأسطول
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-300">
-            متابعة فورية للرحلات، التحصيلات المالية، السائقين وجاهزية الشاحنات.
-          </p>
+    <div id="ejaz-dashboard-view" className="space-y-5" dir="rtl">
+      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#081225] via-[#10203a] to-[#0a1427] p-5 sm:p-7 text-white shadow-xl border border-slate-700/60">
+        <div className="absolute -top-24 -left-16 w-64 h-64 rounded-full bg-orange-500/10 blur-3xl" />
+        <div className="relative flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+          <div><div className="flex items-center gap-2 mb-2"><span className="px-2.5 py-1 rounded-lg bg-orange-500/15 border border-orange-400/30 text-orange-300 text-[10px] font-black">لوحة تشغيل مباشرة</span><span className="text-[10px] text-slate-400">مؤسسة إيجاز للنقليات</span></div><h1 className="text-2xl sm:text-3xl font-black tracking-tight">مركز التحكم التشغيلي</h1><p className="mt-1 text-xs sm:text-sm text-slate-400">صورة لحظية للرحلات، التحصيلات، المصروفات، الأسطول والأداء المالي.</p></div>
+          <div className="flex flex-wrap gap-2"><button type="button" onClick={() => onOpenAddTrip?.()} className="px-4 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-black flex items-center gap-2 shadow-lg"><Plus className="w-4 h-4" />رحلة جديدة</button><button type="button" onClick={() => navigate('FINANCIAL')} className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold flex items-center gap-2"><CreditCard className="w-4 h-4 text-orange-300" />المالية</button><button type="button" onClick={() => navigate('REPORTS')} className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold flex items-center gap-2"><Activity className="w-4 h-4 text-cyan-300" />التقارير</button></div>
         </div>
+        <div className="relative grid grid-cols-3 gap-2 mt-5 pt-4 border-t border-white/10"><div><div className="text-[9px] text-slate-500">الرحلات</div><div className="text-lg font-black">{trips.length}</div><div className="text-[9px] text-emerald-300">{completed} مكتملة</div></div><div><div className="text-[9px] text-slate-500">قيد التشغيل</div><div className="text-lg font-black">{active}</div><div className="text-[9px] text-blue-300">رحلات نشطة</div></div><div><div className="text-[9px] text-slate-500">صافي التشغيل</div><div className={`text-lg font-black ${profit >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>{money(profit)} <span className="text-[9px]">ر.س</span></div><div className="text-[9px] text-slate-500">إيرادات - مصروفات</div></div></div>
+      </section>
 
-        <div className="relative z-10 flex flex-wrap items-center gap-2">
-          <button
-            id="dash-add-trip-btn"
-            type="button"
-            onClick={handleOpenAdd}
-            className="bg-[#F97316] hover:bg-orange-600 active:scale-95 text-white font-bold text-xs sm:text-sm py-2.5 px-4 rounded-xl shadow-md transition flex items-center gap-2 cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>إضافة رحلة جديدة</span>
-          </button>
-          <button
-            id="dash-financial-btn"
-            type="button"
-            onClick={() => navigateTo('FINANCIAL')}
-            className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs sm:text-sm py-2.5 px-3.5 rounded-xl border border-slate-700 transition flex items-center gap-1.5 cursor-pointer"
-          >
-            <CreditCard className="w-4 h-4 text-orange-400" />
-            <span>المالية والتحصيل</span>
-          </button>
-        </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <Metric title="إجمالي الإيرادات" value={money(totalRevenue)} sub="قيمة الرحلات المسجلة" icon={<ArrowUpRight className="w-4 h-4" />} tone="bg-emerald-50 text-emerald-600" onClick={() => navigate('FINANCIAL')} />
+        <Metric title="إجمالي المحصل" value={money(collected)} sub="سندات القبض المسجلة" icon={<CreditCard className="w-4 h-4" />} tone="bg-blue-50 text-blue-600" onClick={() => navigate('COLLECTIONS')} />
+        <Metric title="المبالغ المتبقية" value={money(remaining)} sub="أرصدة قيد التحصيل" icon={<AlertCircle className="w-4 h-4" />} tone="bg-amber-50 text-amber-600" onClick={() => navigate('FINANCIAL')} />
+        <Metric title="إجمالي المصروفات" value={money(expensesTotal)} sub="مصروفات التشغيل المسجلة" icon={<ArrowDownLeft className="w-4 h-4" />} tone="bg-rose-50 text-rose-600" onClick={() => navigate('EXPENSES')} />
       </div>
 
-      {/* Grid of 8 Core Performance Metrics */}
-      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {/* Total Trips */}
-        <div 
-          onClick={() => navigateTo('TRIPS')}
-          className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:border-orange-400 transition cursor-pointer"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">إجمالي الرحلات</span>
-            <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-              <Truck className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-black text-slate-900">{totalTrips}</span>
-            <span className="text-[11px] text-slate-500 font-medium">رحلة</span>
-          </div>
-          <div className="mt-2 text-[11px] text-emerald-600 font-bold flex items-center gap-1">
-            <CheckCircle2 className="w-3 h-3" />
-            <span>{completedTrips} مكتملة</span>
-            <span className="text-slate-400 mx-1">•</span>
-            <span className="text-blue-600">{activeTrips} جارية</span>
-          </div>
-        </div>
-
-        {/* Total Revenues */}
-        <div 
-          onClick={() => navigateTo('FINANCIAL')}
-          className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:border-orange-400 transition cursor-pointer"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">إجمالي الإيرادات</span>
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <ArrowUpRight className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-2 flex items-baseline gap-1">
-            <span className="text-2xl font-black text-slate-900">{totalRevenues.toLocaleString()}</span>
-            <span className="text-xs text-slate-500 font-bold">ر.س</span>
-          </div>
-          <div className="mt-2 text-[11px] text-slate-500">
-            شاملة ضريبة القيمة المضافة 15%
-          </div>
-        </div>
-
-        {/* Total Collected */}
-        <div 
-          onClick={() => navigateTo('FINANCIAL')}
-          className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:border-orange-400 transition cursor-pointer"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">إجمالي المحصل</span>
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
-              <CreditCard className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-2 flex items-baseline gap-1">
-            <span className="text-2xl font-black text-emerald-700">{totalCollected.toLocaleString()}</span>
-            <span className="text-xs text-emerald-700 font-bold">ر.س</span>
-          </div>
-          <div className="mt-2 text-[11px] text-slate-500">
-            تم إيداعه في الحسابات النقدية والبنكية
-          </div>
-        </div>
-
-        {/* Remaining Amount */}
-        <div 
-          onClick={() => navigateTo('FINANCIAL')}
-          className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:border-orange-400 transition cursor-pointer"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">المبالغ المتبقية</span>
-            <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
-              <AlertCircle className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-2 flex items-baseline gap-1">
-            <span className="text-2xl font-black text-amber-600">{totalRemaining.toLocaleString()}</span>
-            <span className="text-xs text-amber-600 font-bold">ر.س</span>
-          </div>
-          <div className="mt-2 text-[11px] text-amber-700 font-semibold">
-            مستحقات آجلة قيد المتابعة
-          </div>
-        </div>
-
-        {/* Total Expenses */}
-        <div 
-          onClick={() => navigateTo('FINANCIAL')}
-          className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:border-orange-400 transition cursor-pointer"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">إجمالي المصروفات</span>
-            <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
-              <ArrowDownLeft className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-2 flex items-baseline gap-1">
-            <span className="text-2xl font-black text-rose-600">{totalExpenses.toLocaleString()}</span>
-            <span className="text-xs text-rose-600 font-bold">ر.س</span>
-          </div>
-          <div className="mt-2 text-[11px] text-slate-500">
-            وقود، صيانة، رسوم وعهد تشغيلية
-          </div>
-        </div>
-
-        {/* Net Profit */}
-        <div 
-          onClick={() => navigateTo('REPORTS')}
-          className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:border-orange-400 transition cursor-pointer"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">صافي الربح</span>
-            <div className="w-8 h-8 rounded-lg bg-orange-50 text-[#F97316] flex items-center justify-center">
-              <TrendingUp className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-2 flex items-baseline gap-1">
-            <span className={`text-2xl font-black ${netProfit >= 0 ? 'text-slate-900' : 'text-red-600'}`}>
-              {netProfit.toLocaleString()}
-            </span>
-            <span className="text-xs text-slate-500 font-bold">ر.س</span>
-          </div>
-          <div className="mt-2 text-[11px] text-orange-600 font-bold">
-            الإيرادات - المصروفات الإجمالية
-          </div>
-        </div>
-
-        {/* Fleet & Personnel Compact Summary */}
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm col-span-2 grid grid-cols-3 divide-x divide-x-reverse divide-slate-100">
-          <div 
-            onClick={() => navigateTo('CUSTOMERS')} 
-            className="text-center px-2 cursor-pointer hover:bg-slate-50 rounded-lg p-1 transition"
-          >
-            <div className="text-xs text-slate-500 font-semibold mb-1">العملاء</div>
-            <div className="text-xl font-black text-slate-900">{totalCustomers}</div>
-            <div className="text-[10px] text-slate-400 mt-0.5">عميل مسجل</div>
-          </div>
-          <div 
-            onClick={() => navigateTo('DRIVERS')} 
-            className="text-center px-2 cursor-pointer hover:bg-slate-50 rounded-lg p-1 transition"
-          >
-            <div className="text-xs text-slate-500 font-semibold mb-1">السائقون</div>
-            <div className="text-xl font-black text-slate-900">{totalDrivers}</div>
-            <div className="text-[10px] text-slate-400 mt-0.5">سائق معتمد</div>
-          </div>
-          <div 
-            onClick={() => navigateTo('TRUCKS')} 
-            className="text-center px-2 cursor-pointer hover:bg-slate-50 rounded-lg p-1 transition"
-          >
-            <div className="text-xs text-slate-500 font-semibold mb-1">الشاحنات</div>
-            <div className="text-xl font-black text-slate-900">{totalTrucks}</div>
-            <div className="text-[10px] text-slate-400 mt-0.5">شاحنة بالأسطول</div>
-          </div>
-        </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">{[
+        ['العملاء', customers.length, 'CUSTOMERS', Users, 'text-blue-600 bg-blue-50'],
+        ['السائقون', drivers.length, 'DRIVERS', UserCheck, 'text-violet-600 bg-violet-50'],
+        ['الشاحنات', trucks.length, 'TRUCKS', Truck, 'text-orange-600 bg-orange-50'],
+        ['الصيانة', maintenance.length, 'MAINTENANCE', Wrench, 'text-rose-600 bg-rose-50'],
+      ].map(([label, value, tab, Icon, tone]) => <button key={String(label)} type="button" onClick={() => navigate(String(tab))} className="bg-white rounded-2xl border border-slate-200 p-3 flex items-center gap-3 text-right hover:shadow-md transition"><span className={`w-10 h-10 rounded-xl flex items-center justify-center ${tone}`}><Icon className="w-4 h-4" /></span><span><b className="block text-sm text-slate-900">{value as number}</b><small className="text-[10px] text-slate-500">{label}</small></span></button>)}
       </div>
 
-      {/* Section: آخر الرحلات (Recent Trips) */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-2.5 h-6 bg-[#F97316] rounded-full" />
-            <h2 className="text-base sm:text-lg font-black text-slate-900">
-              آخر الرحلات والعمليات
-            </h2>
-          </div>
-          <button
-            id="dash-view-all-trips-btn"
-            type="button"
-            onClick={() => navigateTo('TRIPS')}
-            className="text-xs font-bold text-[#F97316] hover:text-orange-700 flex items-center gap-1 cursor-pointer"
-          >
-            <span>عرض كل الرحلات ({trips.length})</span>
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-        </div>
+      <AdvancedAnalytics trips={trips} collections={collections} expenses={expenses} />
 
-        {/* Desktop Table */}
-        <div className="hidden lg:block overflow-x-auto">
-          <table className="w-full text-right text-xs text-slate-700">
-            <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
-              <tr>
-                <th className="py-3 px-4">رقم الرحلة</th>
-                <th className="py-3 px-4">التاريخ</th>
-                <th className="py-3 px-4">العميل</th>
-                <th className="py-3 px-4">السائق</th>
-                <th className="py-3 px-4">السيارة / الشاحنة</th>
-                <th className="py-3 px-4">المسار</th>
-                <th className="py-3 px-4">الإجمالي</th>
-                <th className="py-3 px-4">المدفوع</th>
-                <th className="py-3 px-4">المتبقي</th>
-                <th className="py-3 px-4 text-center">الحالة</th>
-                <th className="py-3 px-4 text-center">إجراءات</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {recentTrips.length === 0 ? (
-                <tr>
-                  <td colSpan={11} className="py-8 text-center text-slate-400">
-                    لا توجد رحلات مسجلة حتى الآن.
-                  </td>
-                </tr>
-              ) : (
-                recentTrips.map(trip => (
-                  <tr key={trip.id} className="hover:bg-slate-50/80 transition">
-                    <td className="py-3 px-4 font-mono font-bold text-slate-900">
-                      {trip.tripNumber}
-                    </td>
-                    <td className="py-3 px-4 text-slate-500 whitespace-nowrap">
-                      {trip.date}
-                    </td>
-                    <td className="py-3 px-4 font-semibold text-slate-900 max-w-[160px] truncate">
-                      {trip.customerName}
-                    </td>
-                    <td className="py-3 px-4 text-slate-700">
-                      {trip.driverName}
-                    </td>
-                    <td className="py-3 px-4 font-mono text-slate-600">
-                      {trip.plateNumber}
-                    </td>
-                    <td className="py-3 px-4 text-slate-600 text-[11px]">
-                      <span className="font-semibold">{trip.loadingLocation.split('-')[0]}</span>
-                      <span className="text-orange-500 mx-1">➔</span>
-                      <span className="font-semibold">{trip.unloadingLocation.split('-')[0]}</span>
-                    </td>
-                    <td className="py-3 px-4 font-bold text-slate-900">
-                      {trip.totalAmount.toLocaleString()} ر.س
-                    </td>
-                    <td className="py-3 px-4 font-bold text-emerald-700">
-                      {trip.paidAmount.toLocaleString()} ر.س
-                    </td>
-                    <td className="py-3 px-4 font-bold text-amber-700">
-                      {trip.remainingAmount.toLocaleString()} ر.س
-                    </td>
-                    <td className="py-3 px-4 text-center whitespace-nowrap">
-                      {getStatusBadge(trip.status)}
-                    </td>
-                    <td className="py-3 px-4 text-center whitespace-nowrap">
-                      <div className="flex items-center justify-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => handleTripClick(trip)}
-                          className="p-1.5 text-slate-600 hover:text-orange-600 hover:bg-orange-50 rounded-md transition cursor-pointer"
-                          title="تفاصيل الرحلة"
-                        >
-                          <FileText className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handlePrint(trip)}
-                          className="p-1.5 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-md transition cursor-pointer"
-                          title="طباعة بوليصة الشحن"
-                        >
-                          <Printer className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleWhatsApp(trip)}
-                          className="p-1.5 text-slate-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition cursor-pointer"
-                          title="مشاركة عبر واتساب"
-                        >
-                          <Share2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Mobile Cards List */}
-        <div className="block lg:hidden divide-y divide-slate-100">
-          {recentTrips.map(trip => (
-            <div key={trip.id} className="p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="font-mono font-bold text-xs text-slate-900 bg-slate-100 px-2 py-0.5 rounded">
-                  {trip.tripNumber}
-                </span>
-                {getStatusBadge(trip.status)}
-              </div>
-
-              <div>
-                <div className="text-sm font-bold text-slate-900">{trip.customerName}</div>
-                <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
-                  <span>السائق: {trip.driverName}</span>
-                  <span>•</span>
-                  <span>الشاحنة: {trip.plateNumber}</span>
-                </div>
-              </div>
-
-              <div className="bg-slate-50 p-2.5 rounded-lg text-xs space-y-1 text-slate-700">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">المسار:</span>
-                  <span className="font-semibold text-slate-900">
-                    {trip.loadingLocation.split('-')[0]} ➔ {trip.unloadingLocation.split('-')[0]}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between font-bold">
-                  <span>الإجمالي: {trip.totalAmount.toLocaleString()} ر.س</span>
-                  <span className="text-emerald-700">المدفوع: {trip.paidAmount.toLocaleString()} ر.س</span>
-                </div>
-                {trip.remainingAmount > 0 && (
-                  <div className="flex items-center justify-between text-amber-700 font-bold">
-                    <span>المتبقي:</span>
-                    <span>{trip.remainingAmount.toLocaleString()} ر.س</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex items-center justify-between pt-1">
-                <button
-                  type="button"
-                  onClick={() => handleTripClick(trip)}
-                  className="text-xs font-bold text-orange-600 bg-orange-50 hover:bg-orange-100 px-3 py-1.5 rounded-lg transition cursor-pointer"
-                >
-                  عرض التفاصيل
-                </button>
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => handlePrint(trip)}
-                    className="p-2 text-slate-600 hover:text-blue-600 bg-slate-100 rounded-lg transition cursor-pointer"
-                    title="طباعة"
-                  >
-                    <Printer className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleWhatsApp(trip)}
-                    className="p-2 text-slate-600 hover:text-emerald-600 bg-slate-100 rounded-lg transition cursor-pointer"
-                    title="واتساب"
-                  >
-                    <Share2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="p-4 border-b border-slate-100 flex items-center justify-between"><div className="flex items-center gap-2"><span className="w-2 h-6 rounded-full bg-orange-500" /><h2 className="font-black text-sm sm:text-base text-slate-900">آخر الرحلات والعمليات</h2></div><button type="button" onClick={() => navigate('TRIPS')} className="text-[10px] font-black text-orange-600 flex items-center gap-1">عرض الكل ({trips.length})<ChevronLeft className="w-4 h-4" /></button></div>
+        {recentTrips.length === 0 ? <div className="py-12 text-center text-sm text-slate-400">لا توجد رحلات مسجلة حتى الآن.</div> : <div className="divide-y divide-slate-100">{recentTrips.map(trip => <div key={trip.id} className="p-4 hover:bg-slate-50/70 transition"><div className="flex flex-col lg:flex-row lg:items-center gap-3 justify-between"><div className="flex items-center gap-3 min-w-0"><span className="font-mono font-black text-xs bg-slate-100 text-slate-700 rounded-lg px-2.5 py-1">{trip.tripNumber}</span><div className="min-w-0"><b className="block text-xs text-slate-900 truncate">{trip.customerName}</b><span className="text-[10px] text-slate-500">{trip.driverName || 'بدون سائق'} · {trip.plateNumber || 'بدون شاحنة'}</span></div></div><div className="flex flex-wrap items-center gap-3 text-[10px]"><span className="text-slate-400">{trip.date}</span><span className="font-bold text-slate-800">{money(trip.totalAmount)} ر.س</span><span className="text-emerald-600 font-bold">مدفوع {money(trip.paidAmount)} ر.س</span><span className="text-amber-600 font-bold">متبقي {money(trip.remainingAmount)} ر.س</span>{status(trip.status)}</div><div className="flex items-center gap-1"><button type="button" onClick={() => onViewTrip?.(trip)} className="p-2 rounded-lg hover:bg-orange-50 text-slate-500 hover:text-orange-600" title="التفاصيل"><FileText className="w-4 h-4" /></button><button type="button" onClick={() => (onPrintWaybill ? onPrintWaybill(trip) : printTripWaybill(trip))} className="p-2 rounded-lg hover:bg-blue-50 text-slate-500 hover:text-blue-600" title="طباعة"><Printer className="w-4 h-4" /></button><button type="button" onClick={() => (onShareWhatsApp ? onShareWhatsApp(trip) : shareTripViaWhatsApp(trip))} className="p-2 rounded-lg hover:bg-emerald-50 text-slate-500 hover:text-emerald-600" title="واتساب"><Share2 className="w-4 h-4" /></button></div></div></div>)}</div>}
+      </section>
     </div>
   );
 };
