@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import crypto from 'crypto';
-import { Database } from '../database';
+import { Database, getDefaultServerPermissions } from '../database';
 import { 
   hashPassword, 
   generateSalt, 
@@ -237,6 +237,7 @@ authRouter.post('/setup-owner', (req, res: Response) => {
         role: 'SUPER_ADMIN',
         phone: phone?.trim() || '',
         active: true,
+        permissions: getDefaultServerPermissions('SUPER_ADMIN'),
         passwordSalt: salt,
         passwordHash: passwordHash,
         mustChangePassword: false,
