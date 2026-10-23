@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express, { Request, Response, NextFunction } from 'express';
 import path from 'path';
 import fs from 'fs';
@@ -21,7 +22,7 @@ const rootDir = path.resolve(__dirname, '../..');
 
 export async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT || 3000);
   const isProduction = process.env.NODE_ENV === 'production';
 
   // Initialize central database
@@ -47,6 +48,7 @@ export async function startServer() {
   app.get('/api/health', (req: Request, res: Response) => {
     res.json({
       status: 'UP',
+      database: 'LOCAL_JSON_PERSISTENT',
       system: 'EJAZ Logistics ERP Central Server',
       timestamp: new Date().toISOString(),
       uptimeSeconds: Math.floor(process.uptime()),
@@ -105,8 +107,11 @@ export async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 EJAZ Logistics ERP Full-Stack Server running on http://0.0.0.0:${PORT}`);
+  const host = process.env.HOST || '0.0.0.0';
+  app.listen(PORT, host, () => {
+    console.log(`🚀 EJAZ central server listening on http://${host}:${PORT}`);
+    console.log(`📁 Persistent database: ${path.resolve(process.cwd(), 'data', 'ejaz_database.json')}`);
+    console.log('🔒 Keep this server on the trusted local network. Do not expose port 3000 directly to the internet.');
   });
 }
 
