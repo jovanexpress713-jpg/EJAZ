@@ -331,12 +331,16 @@ export class SyncEngine {
       if (!isOnline) {
         return { success: false, pushedCount: 0, pulledCount: 0, error: 'غير متصل بالخادم المركزي' };
       }
+      if (!ApiClient.getToken()) {
+        return { success: false, pushedCount: 0, pulledCount: 0, error: 'الخادم متاح لكن لا توجد جلسة مركزية مصادق عليها. سجّل الدخول مجددًا.' };
+      }
 
       this.registerCurrentDevice(currentUser);
       const outbox = this.getOutbox();
       const pendingItems = outbox.filter(item => item.status === 'PENDING' || (item.status === 'FAILED' && (item.retryCount || 0) < 5));
 
       let pushedCount = 0;
+      let pushErrorMessage: string | undefined;
       if (pendingItems.length > 0) {
         try {
           const pushRes = await ApiClient.syncPush(
@@ -350,12 +354,14 @@ export class SyncEngine {
           }
         } catch (pushErr: any) {
           console.warn('Sync push error:', pushErr);
-          pendingItems.forEach(item => this.markFailed(item.id, pushErr?.message || 'خطأ في إرسال العملية'));
+          pushErrorMessage = pushErr?.message || 'خطأ في إرسال العملية';
+          pendingItems.forEach(item => this.markFailed(item.id, pushErrorMessage || 'خطأ في إرسال العملية'));
         }
       }
 
       // Pull updates from central server
       let pulledCount = 0;
+      let pullErrorMessage: string | undefined;
       try {
         const pullRes = await ApiClient.syncPull();
         if (pullRes && pullRes.data) {
@@ -364,11 +370,15 @@ export class SyncEngine {
         }
       } catch (pullErr: any) {
         console.warn('Sync pull error:', pullErr);
+        pullErrorMessage = pullErr?.message || 'تعذر تنزيل بيانات الخادم المركزي';
       }
 
       // Clean up synced operations older than 24h
       this.purgeSyncedItems();
 
+      if (pushErrorMessage || pullErrorMessage) {
+        return { success: false, pushedCount, pulledCount, error: pushErrorMessage || pullErrorMessage };
+      }
       return { success: true, pushedCount, pulledCount };
     } catch (err: any) {
       console.warn('Sync failed:', err);
