@@ -1,24 +1,61 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#0F172A">
+    android:background="#07111F">
 
     <ProgressBar
         android:id="@+id/progressBar"
         style="?android:attr/progressBarStyleHorizontal"
         android:layout_width="match_parent"
         android:layout_height="3dp"
-        android:layout_alignParentTop="true"
+        android:layout_gravity="top"
         android:indeterminate="false"
         android:max="100"
-        android:progressTint="#F97316"
+        android:progressTint="#F5A623"
         android:visibility="gone" />
 
     <WebView
         android:id="@+id/webView"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_below="@id/progressBar" />
+        android:layout_height="match_parent" />
 
-</RelativeLayout>
+    <!-- Premium animated launch layer; removed automatically after the real app is ready. -->
+    <FrameLayout
+        android:id="@+id/launchOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#07111F"
+        android:clickable="true"
+        android:focusable="true"
+        android:elevation="20dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:paddingStart="28dp"
+            android:paddingEnd="28dp">
+
+            <ImageView
+                android:id="@+id/launchLogo"
+                android:layout_width="230dp"
+                android:layout_height="230dp"
+                android:adjustViewBounds="true"
+                android:contentDescription="EJAZ"
+                android:scaleType="fitCenter"
+                android:src="@mipmap/ic_launcher" />
+
+            <View
+                android:id="@+id/launchGoldLine"
+                android:layout_width="150dp"
+                android:layout_height="2dp"
+                android:layout_marginTop="18dp"
+                android:alpha="0.15"
+                android:background="#F5A623" />
+        </LinearLayout>
+    </FrameLayout>
+
+</FrameLayout>
