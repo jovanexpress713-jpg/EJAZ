@@ -26,6 +26,7 @@ export const FirstRunSetupModal: React.FC<FirstRunSetupModalProps> = ({
   const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('admin');
   const [phone, setPhone] = useState('');
+  const [setupKey, setSetupKey] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [recoveryKey, setRecoveryKey] = useState<string>(() => generateRecoveryKey());
@@ -99,7 +100,8 @@ export const FirstRunSetupModal: React.FC<FirstRunSetupModalProps> = ({
         fullName: fullName.trim(),
         username: username.trim().toLowerCase(),
         phone: phone.trim(),
-        password: password,
+        password,
+        setupKey: setupKey.trim(),
       }).catch(err => console.warn('Server owner sync note:', err));
 
       // Also update settings owner phone
@@ -155,6 +157,19 @@ export const FirstRunSetupModal: React.FC<FirstRunSetupModalProps> = ({
                   className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white pl-8 focus:outline-none focus:border-orange-500"
                 />
                 <UserIcon className="w-4 h-4 text-slate-400 absolute left-2.5 top-2.5" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  مفتاح تهيئة الخادم المركزي (إذا كان مربوطًا)
+                </label>
+                <input
+                  type="password"
+                  autoComplete="off"
+                  value={setupKey}
+                  onChange={e => setSetupKey(e.target.value)}
+                  placeholder="يُترك فارغًا في وضع العمل المحلي"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-orange-500"
+                />
               </div>
             </div>
 
