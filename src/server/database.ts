@@ -37,7 +37,7 @@ export interface DatabaseSchema {
   dailyHandovers: DailyHandoverReport[];
 }
 
-const DATA_DIR = path.resolve(process.cwd(), 'data');
+const DATA_DIR = path.resolve(process.env.EJAZ_DATA_DIR || path.join(process.cwd(), 'data'));
 const DB_FILE = path.join(DATA_DIR, 'ejaz_database.json');
 const BACKUP_DIR = path.join(DATA_DIR, 'backups');
 
