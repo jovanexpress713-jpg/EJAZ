@@ -114,7 +114,7 @@ jobs:
                "./node_modules/*" \
                "./app/build/*" \
                "./data/*" \
-               "./.env" \\
+               "./.env" \
                "./VICTORIA-Logistics-ERP-Central-Server-v1.2.0.zip"
           test -s "$SERVER_ZIP"
           echo "Central server package created: $SERVER_ZIP"
