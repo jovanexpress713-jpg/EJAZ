@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import crypto from 'crypto';
 import { Database } from '../database';
 import { 
   hashPassword, 
@@ -189,14 +190,33 @@ authRouter.post('/change-password', authenticate, (req: AuthenticatedRequest, re
 // POST /api/auth/setup-owner (First run setup for Owner)
 authRouter.post('/setup-owner', (req, res: Response) => {
   try {
-    const { fullName, username, phone, password } = req.body;
+    const { fullName, username, phone, password, setupKey } = req.body;
     if (!fullName || !username || !password) {
-      res.status(400).json({ success: false, error: 'جميع الحقول مطلوبة لإعداد حساب المالك' });
+      res.status(400).json({ success: false, error: 'جميع الحقول المطلوبة لإعداد حساب المالك يجب تعبئتها' });
+      return;
+    }
+
+    // Central owner setup is a one-time privileged action. Never expose an unauthenticated
+    // owner-reset endpoint on a deployed server.
+    const expectedSetupKey = process.env.OWNER_SETUP_KEY || '';
+    if (!expectedSetupKey) {
+      res.status(503).json({ success: false, error: 'تهيئة المالك المركزي معطلة: يجب على مسؤول الخادم ضبط OWNER_SETUP_KEY أولًا' });
+      return;
+    }
+    const suppliedSetupKey = String(setupKey || '');
+    const expectedBuffer = Buffer.from(expectedSetupKey, 'utf8');
+    const suppliedBuffer = Buffer.from(suppliedSetupKey, 'utf8');
+    if (expectedBuffer.length !== suppliedBuffer.length || !crypto.timingSafeEqual(expectedBuffer, suppliedBuffer)) {
+      res.status(403).json({ success: false, error: 'مفتاح تهيئة الخادم غير صحيح' });
       return;
     }
 
     const db = Database.get();
     let owner = db.users.find(u => u.role === 'SUPER_ADMIN');
+    if (owner && (owner.passwordHash || owner.passwordSalt || owner.password !== 'admin')) {
+      res.status(409).json({ success: false, error: 'تم إعداد حساب المالك المركزي مسبقًا. استخدم تسجيل الدخول أو إجراء استعادة معتمد.' });
+      return;
+    }
     const salt = generateSalt();
     const passwordHash = hashPassword(password, salt);
 
