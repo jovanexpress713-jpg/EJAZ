@@ -261,7 +261,7 @@ const DEFAULT_USERS: User[] = [
     phone: '05394417755',
     active: true,
     password: 'admin',
-    mustChangePassword: false,
+    mustChangePassword: true,
     permissions: getDefaultPermissions('SUPER_ADMIN'),
   },
   {
@@ -272,7 +272,7 @@ const DEFAULT_USERS: User[] = [
     phone: '0502233445',
     active: true,
     password: '123',
-    mustChangePassword: false,
+    mustChangePassword: true,
     permissions: getDefaultPermissions('COMPANY_MANAGER'),
   },
   {
@@ -283,7 +283,7 @@ const DEFAULT_USERS: User[] = [
     phone: '0501122334',
     active: true,
     password: '123',
-    mustChangePassword: false,
+    mustChangePassword: true,
     permissions: getDefaultPermissions('OPERATIONS'),
   },
   {
@@ -294,7 +294,7 @@ const DEFAULT_USERS: User[] = [
     phone: '0559988776',
     active: true,
     password: '123',
-    mustChangePassword: false,
+    mustChangePassword: true,
     permissions: getDefaultPermissions('ACCOUNTANT'),
   },
   {
@@ -305,7 +305,7 @@ const DEFAULT_USERS: User[] = [
     phone: '0567788990',
     active: true,
     password: '123',
-    mustChangePassword: false,
+    mustChangePassword: true,
     permissions: getDefaultPermissions('CASHIER'),
   },
   {
@@ -316,7 +316,7 @@ const DEFAULT_USERS: User[] = [
     phone: '0541122998',
     active: true,
     password: '123',
-    mustChangePassword: false,
+    mustChangePassword: true,
     permissions: getDefaultPermissions('AUDITOR'),
   },
 ];
@@ -503,9 +503,38 @@ export class StorageService {
       if (!hasItem(STORAGE_KEYS.NOTIFICATIONS)) {
         setItem(STORAGE_KEYS.NOTIFICATIONS, DEFAULT_NOTIFICATIONS, false);
       }
-      // Default current user if not logged in
+      // A fresh installation must never start with an authenticated default admin session.
       if (!hasItem(STORAGE_KEYS.CURRENT_USER)) {
-        setItem(STORAGE_KEYS.CURRENT_USER, DEFAULT_USERS[0], false);
+        setItem(STORAGE_KEYS.CURRENT_USER, null, false);
+      }
+
+      // Force password rotation for legacy/demo accounts that still use known default passwords.
+      const storedUsers = getItem<User[]>(STORAGE_KEYS.USERS, []);
+      let usersChanged = false;
+      const weakDefaultUserIds = new Set<string>();
+      for (const user of storedUsers) {
+        const username = String(user.username || '').trim().toLowerCase();
+        const password = String(user.password || '');
+        const isKnownDefault =
+          (username === 'admin' && password === 'admin') ||
+          password === '123' ||
+          password === '123456';
+        if (isKnownDefault) {
+          weakDefaultUserIds.add(user.id);
+          if (user.mustChangePassword !== true) {
+            user.mustChangePassword = true;
+            usersChanged = true;
+          }
+        }
+      }
+      if (usersChanged) {
+        setItem(STORAGE_KEYS.USERS, storedUsers, false);
+      }
+
+      // End any old session that belonged to a default-credential account.
+      const currentUser = getItem<User | null>(STORAGE_KEYS.CURRENT_USER, null);
+      if (currentUser && weakDefaultUserIds.has(currentUser.id)) {
+        setItem(STORAGE_KEYS.CURRENT_USER, null, false);
       }
     } catch (e) {
       console.warn('StorageService init safe warning:', e);
