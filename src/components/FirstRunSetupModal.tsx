@@ -9,7 +9,7 @@ import React, { useState } from 'react';
 import { ShieldCheck, User as UserIcon, Phone, Key, Lock, Copy, Check, Sparkles, AlertTriangle, ArrowLeft } from 'lucide-react';
 import { User } from '../types';
 import { StorageService, getDefaultPermissions } from '../services/storage';
-import { generateRecoveryKey, generateSalt } from '../services/security';
+import { generateRecoveryKey, generateSalt, hashPasswordWithSalt } from '../services/security';
 import { ApiClient } from '../services/apiClient';
 
 interface FirstRunSetupModalProps {
@@ -23,9 +23,9 @@ export const FirstRunSetupModal: React.FC<FirstRunSetupModalProps> = ({
   onClose,
   onSetupComplete,
 }) => {
-  const [fullName, setFullName] = useState('عبد الله القرني (المالك)');
+  const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('admin');
-  const [phone, setPhone] = useState('05394417755');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [recoveryKey, setRecoveryKey] = useState<string>(() => generateRecoveryKey());
@@ -61,18 +61,21 @@ export const FirstRunSetupModal: React.FC<FirstRunSetupModalProps> = ({
     setStep(2);
   };
 
-  const handleFinalizeSetup = () => {
+  const handleFinalizeSetup = async () => {
     try {
       const users = StorageService.getUsers();
       let owner = users.find(u => u.role === 'SUPER_ADMIN');
+      const passwordSalt = generateSalt();
+      const passwordHash = await hashPasswordWithSalt(password, passwordSalt);
       
       if (owner) {
         owner.fullName = fullName.trim();
         owner.username = username.trim().toLowerCase();
         owner.phone = phone.trim();
-        owner.password = password;
+        delete owner.password;
         owner.mustChangePassword = false;
-        owner.passwordSalt = generateSalt();
+        owner.passwordSalt = passwordSalt;
+        owner.passwordHash = passwordHash;
       } else {
         owner = {
           id: 'usr_owner_' + Date.now(),
@@ -81,9 +84,9 @@ export const FirstRunSetupModal: React.FC<FirstRunSetupModalProps> = ({
           role: 'SUPER_ADMIN',
           phone: phone.trim(),
           active: true,
-          password: password,
           mustChangePassword: false,
-          passwordSalt: generateSalt(),
+          passwordSalt,
+          passwordHash,
           permissions: getDefaultPermissions('SUPER_ADMIN'),
         };
       }
