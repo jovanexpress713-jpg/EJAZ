@@ -111,13 +111,14 @@ jobs:
           SERVER_ZIP="$GITHUB_WORKSPACE/VICTORIA-Logistics-ERP-Central-Server-v1.2.0.zip"
           STAGE="$RUNNER_TEMP/central-server-package"
           mkdir -p "$STAGE"
-          rsync -a ./ "$STAGE/" \
+          rsync -a \
             --exclude ".git/" \
             --exclude "node_modules/" \
             --exclude "app/build/" \
             --exclude "data/" \
             --exclude ".env" \
-            --exclude "VICTORIA-Logistics-ERP-Central-Server-v1.2.0.zip"
+            --exclude "VICTORIA-Logistics-ERP-Central-Server-v1.2.0.zip" \
+            ./ "$STAGE/"
           (cd "$STAGE" && zip -qr "$SERVER_ZIP" .)
           test -s "$SERVER_ZIP"
           unzip -t "$SERVER_ZIP" >/dev/null
