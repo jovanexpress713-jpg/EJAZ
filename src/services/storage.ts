@@ -505,7 +505,7 @@ export class StorageService {
       }
       // A fresh installation must never start with an authenticated default admin session.
       if (!hasItem(STORAGE_KEYS.CURRENT_USER)) {
-        setItem(STORAGE_KEYS.CURRENT_USER, null, false);
+        setItem(STORAGE_KEYS.CURRENT_USER, null);
       }
 
       // Force password rotation for legacy/demo accounts that still use known default passwords.
@@ -2182,8 +2182,15 @@ export class StorageService {
           const dbVal = records[key];
           let finalVal = dbVal;
 
+          // Session state in memory is authoritative during startup/logout. Never resurrect an old
+          // IndexedDB login session after the user has been logged out or first-run setup has started.
+          if (key === STORAGE_KEYS.CURRENT_USER && inMemoryStore[key] !== undefined) {
+            finalVal = JSON.parse(inMemoryStore[key]);
+            UnlimitedStorage.setItem(key, finalVal);
+          }
+
           // If inMemoryStore had newly added items before hydration finished, merge arrays safely
-          if (inMemoryStore[key]) {
+          if (key !== STORAGE_KEYS.CURRENT_USER && inMemoryStore[key]) {
             try {
               const memVal = JSON.parse(inMemoryStore[key]);
               if (Array.isArray(memVal) && Array.isArray(dbVal)) {
