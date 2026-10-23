@@ -2553,6 +2553,7 @@ export class StorageService {
       handovers.unshift(report);
     }
     setItem(STORAGE_KEYS.DAILY_HANDOVERS, handovers);
+    SyncEngine.enqueueOperation('HANDOVER', report.id, idx >= 0 ? 'UPDATE' : 'CREATE', report, actor);
 
     if (actor) {
       this.addAuditLog(actor, 'BACKUP_RESTORE', 'DailyHandover', report.id, `حفظ محضر التسليم النهاري رقم: ${report.reportNumber} للمستلم (${report.recipientName})`);
