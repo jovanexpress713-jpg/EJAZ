@@ -53,12 +53,18 @@ jobs:
             exit 1
           fi
 
-      - name: 7. Set up Gradle 8.2 Toolchain
+      - name: 7. Run central server integration tests
+        env:
+          JWT_SECRET: integration-test-only-secret-is-not-used-for-production
+          OWNER_SETUP_KEY: integration-test-only-owner-setup-key
+        run: npm run test:central-server
+
+      - name: 8. Set up Gradle 8.2 Toolchain
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.2'
 
-      - name: 8. Validate Android project and launcher resources
+      - name: 9. Validate Android project and launcher resources
         run: |
           test -f settings.gradle.kts
           test -f app/build.gradle.kts
@@ -69,10 +75,10 @@ jobs:
           grep -q 'VICTORIA Logistics ERP' app/src/main/res/values/strings.xml
           echo "Android launcher branding and resources verified."
 
-      - name: 9. Build Debug APK with full stacktrace
+      - name: 10. Build Debug APK with full stacktrace
         run: gradle assembleDebug --stacktrace --info
 
-      - name: 10. Inspect APK integrity and verify size threshold
+      - name: 11. Inspect APK integrity and verify size threshold
         run: |
           RAW_APK="app/build/outputs/apk/debug/app-debug.apk"
           test -f "$RAW_APK"
@@ -87,7 +93,7 @@ jobs:
           unzip -t "$RAW_APK" >/dev/null
           echo "APK ZIP integrity verified."
 
-      - name: 11. Prepare versioned APK artifact name
+      - name: 12. Prepare versioned APK artifact name
         id: prep
         run: |
           VERSION="1.2.0"
@@ -98,7 +104,7 @@ jobs:
           echo "apk_filename=${FINAL_NAME}" >> "$GITHUB_OUTPUT"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
-      - name: 12. Upload Complete APK Artifact
+      - name: 13. Upload Complete APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: VICTORIA-Logistics-ERP-APK-v1.2.0
@@ -106,7 +112,7 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: 13. Package local central server for handoff
+      - name: 14. Package local central server for handoff
         run: |
           SERVER_ZIP="$GITHUB_WORKSPACE/VICTORIA-Logistics-ERP-Central-Server-v1.2.0.zip"
           STAGE="$RUNNER_TEMP/central-server-package"
@@ -126,7 +132,7 @@ jobs:
           unzip -l "$SERVER_ZIP" | grep -q "src/server/serverMain.ts"
           echo "Central server source package created and verified: $SERVER_ZIP"
 
-      - name: 14. Upload local central server package
+      - name: 15. Upload local central server package
         uses: actions/upload-artifact@v4
         with:
           name: VICTORIA-Logistics-ERP-Central-Server-v1.2.0
@@ -134,7 +140,7 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: 15. Create GitHub Release with APK on main push
+      - name: 16. Create GitHub Release with APK on main push
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
