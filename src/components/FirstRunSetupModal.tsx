@@ -213,6 +213,7 @@ export const FirstRunSetupModal: React.FC<FirstRunSetupModalProps> = ({
                 </span>
               </label>
               {!offlineMode && (
+              <>
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   رابط الخادم المركزي المحلي (على نفس شبكة Wi-Fi)
@@ -242,6 +243,7 @@ export const FirstRunSetupModal: React.FC<FirstRunSetupModalProps> = ({
                   className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-orange-500"
                 />
               </div>
+              </>
               )}
             </div>
 
