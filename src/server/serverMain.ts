@@ -28,6 +28,23 @@ export async function startServer() {
   // Initialize central database
   Database.initialize();
 
+  // Create scheduled local backups and keep the most recent 30 snapshots.
+  const backupTimer = setInterval(() => {
+    try {
+      const backupPath = Database.createBackup();
+      const backupDir = path.dirname(backupPath);
+      const backups = fs.readdirSync(backupDir)
+        .filter(name => name.startsWith('backup_') && name.endsWith('.json'))
+        .map(name => ({ name, mtime: fs.statSync(path.join(backupDir, name)).mtimeMs }))
+        .sort((a, b) => b.mtime - a.mtime);
+      backups.slice(30).forEach(item => fs.unlinkSync(path.join(backupDir, item.name)));
+      console.log('Central database backup created:', backupPath);
+    } catch (backupError) {
+      console.error('Central database scheduled backup failed:', backupError);
+    }
+  }, 6 * 60 * 60 * 1000);
+  backupTimer.unref();
+
   // Middleware
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ extended: true, limit: '50mb' }));
