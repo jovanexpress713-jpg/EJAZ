@@ -27,7 +27,7 @@ syncRouter.get('/status', (req, res: Response) => {
 });
 
 // GET /api/sync/pull
-syncRouter.get('/pull', optionalAuthenticate, (req: AuthenticatedRequest, res: Response) => {
+syncRouter.get('/pull', authenticate, (req: AuthenticatedRequest, res: Response) => {
   try {
     const db = Database.get();
     const sinceSeq = Number(req.query.sinceSeq) || 0;
@@ -72,7 +72,7 @@ syncRouter.get('/pull', optionalAuthenticate, (req: AuthenticatedRequest, res: R
 });
 
 // POST /api/sync/push
-syncRouter.post('/push', optionalAuthenticate, (req: AuthenticatedRequest, res: Response) => {
+syncRouter.post('/push', authenticate, (req: AuthenticatedRequest, res: Response) => {
   try {
     const { items, deviceId, deviceName } = req.body;
     if (!Array.isArray(items) || items.length === 0) {
