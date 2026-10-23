@@ -59,6 +59,7 @@ import { StorageService, getDefaultPermissions } from '../services/storage';
 import { SYSTEM_INFO } from '../constants/systemInfo';
 import { downloadFullProjectZip } from '../utils/zipExporter';
 import { generateTemporaryPassword } from '../services/security';
+import { ApiClient } from '../services/apiClient';
 
 export interface PermissionCategory {
   id: string;
@@ -190,7 +191,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onRefresh,
   onOpenAbout,
 }) => {
-  const [activeTab, setActiveTab] = useState<'COMPANY' | 'ROLES' | 'AUDIT' | 'BACKUP' | 'SYSTEM_INFO'>('COMPANY');
+  const [centralServerUrl, setCentralServerUrl] = useState(() => ApiClient.getBaseUrl());
+  const [centralServerStatus, setCentralServerStatus] = useState<'UNKNOWN' | 'CHECKING' | 'CONNECTED' | 'OFFLINE'>('UNKNOWN');
+  const [centralServerMessage, setCentralServerMessage] = useState('');
+  const [activeTab, setActiveTab] = useState<'COMPANY' | 'ROLES' | 'AUDIT' | 'BACKUP' | 'CENTRAL_SERVER' | 'SYSTEM_INFO'>('COMPANY');
   const [copiedPhone, setCopiedPhone] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [storageDiagnostics, setStorageDiagnostics] = useState<{
@@ -702,6 +706,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         >
           <RotateCcw className="w-4 h-4 text-orange-500" />
           <span>النسخ الاحتياطي والاستعادة</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('CENTRAL_SERVER')}
+          className={`px-4 py-2.5 text-xs sm:text-sm font-bold border-b-2 transition whitespace-nowrap cursor-pointer flex items-center gap-2 ${
+            activeTab === 'CENTRAL_SERVER' ? 'border-[#F97316] text-[#F97316]' : 'border-transparent text-slate-500 hover:text-slate-900'
+          }`}
+        >
+          <Server className="w-4 h-4 text-orange-500" />
+          <span>الخادم المركزي المحلي</span>
         </button>
 
         <button
@@ -2193,6 +2207,65 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       )}
 
       {/* 5. SYSTEM INFO & COPYRIGHTS (معلومات النظام وحقوق البرمجة) */}
+      {activeTab === 'CENTRAL_SERVER' && (
+        <div className="space-y-5 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="p-3 rounded-xl bg-orange-100 text-orange-700"><Server className="w-6 h-6" /></div>
+              <div>
+                <h3 className="text-lg font-black text-slate-900">ربط الأجهزة بالخادم المركزي المحلي</h3>
+                <p className="text-sm text-slate-600 mt-1">شغّل الخادم على كمبيوتر دائم التشغيل داخل المكتب، ثم اربط الهواتف والأجهزة بعنوانه على شبكة Wi-Fi نفسها. لا يحتاج الاتصال إلى الإنترنت.</p>
+              </div>
+            </div>
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-6 text-amber-900">
+              لا تضع localhost أو 127.0.0.1 في الهاتف؛ هذا يشير إلى الهاتف نفسه. استخدم عنوان الكمبيوتر مثل http://192.168.1.10:3000. اسمح بالمنفذ 3000 على الشبكة المحلية فقط.
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">عنوان الخادم</label>
+              <input type="url" value={centralServerUrl} onChange={e => setCentralServerUrl(e.target.value)} placeholder="http://192.168.1.10:3000" dir="ltr" className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-3 text-sm font-mono" />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={async () => {
+                try {
+                  ApiClient.setBaseUrl(centralServerUrl);
+                  setCentralServerStatus('CHECKING');
+                  setCentralServerMessage('جارٍ اختبار اتصال الخادم وقاعدة البيانات...');
+                  const status = await ApiClient.getServerStatus();
+                  if (!status || typeof status.serverSequence !== 'number') throw new Error('استجابة الخادم غير مكتملة');
+                  setCentralServerStatus('CONNECTED');
+                  setCentralServerMessage(`اتصال ناجح — الرحلات: ${status.metrics?.tripsCount ?? 0}، العملاء: ${status.metrics?.customersCount ?? 0}، آخر تحديث: ${status.lastUpdated || 'غير متاح'}`);
+                } catch (error: any) {
+                  setCentralServerStatus('OFFLINE');
+                  setCentralServerMessage(error?.message || 'تعذر الوصول للخادم. تحقق من العنوان والشبكة وجدار الحماية.');
+                }
+              }} className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center gap-2">
+                <Wifi className="w-4 h-4" /> اختبار الاتصال وحفظ العنوان
+              </button>
+              <button type="button" onClick={() => {
+                ApiClient.setBaseUrl('');
+                setCentralServerUrl('');
+                setCentralServerStatus('UNKNOWN');
+                setCentralServerMessage('تم مسح عنوان الخادم من هذا الجهاز فقط.');
+              }} className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold">مسح العنوان</button>
+            </div>
+            {centralServerMessage && (
+              <div className={`rounded-xl border p-3 text-xs leading-6 ${centralServerStatus === 'CONNECTED' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : centralServerStatus === 'OFFLINE' ? 'bg-rose-50 border-rose-200 text-rose-800' : 'bg-slate-50 border-slate-200 text-slate-700'}`}>
+                {centralServerStatus === 'CHECKING' ? 'جارٍ الاختبار… ' : centralServerStatus === 'CONNECTED' ? 'متصل فعليًا: ' : centralServerStatus === 'OFFLINE' ? 'غير متصل: ' : ''}{centralServerMessage}
+              </div>
+            )}
+            <div className="border-t border-slate-200 pt-4">
+              <h4 className="font-bold text-slate-900 text-sm mb-2">متطلبات تشغيل الخادم المحلي</h4>
+              <ul className="list-disc pr-5 text-xs text-slate-600 space-y-1.5 leading-6">
+                <li>كمبيوتر أو جهاز مخصص يعمل باستمرار، مع Node.js LTS وتثبيت المشروع عليه.</li>
+                <li>قاعدة البيانات تحفظ في مجلد data على قرص الكمبيوتر، مع نسخ احتياطية دورية.</li>
+                <li>يجب أن تكون الأجهزة على شبكة Wi-Fi/LAN واحدة، وأن يسمح جدار الحماية بالمنفذ 3000.</li>
+                <li>نجاح الاختبار يؤكد استجابة الخادم فقط؛ يلزم اختبار المزامنة الفعلية من جهازين قبل إدخال بيانات حقيقية.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
       {activeTab === 'SYSTEM_INFO' && (
         <div className="space-y-6 animate-in fade-in duration-200">
           {/* Top Banner with Badges */}
