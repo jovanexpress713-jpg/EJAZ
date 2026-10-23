@@ -1,53 +1,37 @@
-# دليل بناء وتحديث تطبيق VICTORIA Logistics ERP (Android APK)
+# VICTORIA Logistics ERP — Android build and handoff notes
 
-تم ربط وتجهيز هذا المشروع بنظام بناء آلي مستمر عبر **GitHub Actions**، بحيث يُبنى تطبيق Android APK كامل ونهائي تلقائيًا مع كل تحديث على فرع `main`.
+## Application identity
 
----
+- Display name: `VICTORIA Logistics ERP`
+- Business module: مؤسسة إيجاز للنقليات
+- Android package: `sa.ejaz.transport`
+- Current project version: `1.2.0` (`versionCode 3`)
+- Android launcher icon: `app/src/main/res/drawable/ic_ejaz_launcher.xml`
+- Build workflow: `.github/workflows/build-ejaz-apk.yml`
 
-## 🎯 الهوية والمعرّفات المعتمدة
+## Build and download
 
-- **الاسم الرسمي للنظام والتطبيق**: `VICTORIA Logistics ERP`
-- **القطاع التشغيلي الداخلي**: `قطاع إيجـاز للنقليات (EJAZ Transport Module)`
-- **معرّف الحزمة الثابت (applicationId)**: `sa.ejaz.transport`
-- **رقم الإصدار (versionName)**: `1.1.0`
-- **كود الإصدار (versionCode)**: `2` (يدعم الترقية والتثبيت فوق الإصدارات السابقة)
-- **المطور**: `فكتوريا لاين سوفت للأنظمة والبرمجة (+967771119726)`
+1. Open [GitHub Actions](https://github.com/jovanexpress713-jpg/EJAZ/actions).
+2. Open the newest run with a green check mark.
+3. In the run summary, download the artifact named `VICTORIA-Logistics-ERP-APK-v1.2.0`.
+4. Extract the ZIP and install the APK on an Android test device.
+5. Test sign-in, adding/editing a trip, customer and driver records, collection/expense vouchers, reports, backup export/import, and restart persistence before using live customer data.
 
----
+The workflow runs the TypeScript check, builds the web assets, validates Android resources, assembles the APK, and checks the APK archive and size.
 
-## 🚀 كيفية بناء وتحميل ملف APK من GitHub تلقائيًا
+## Important delivery limitations
 
-1. **المصدر الرسمي الوحيد**:
-   مستودع GitHub على الفرع الرئيسي `main`. كل تحديث يُرفع إلى `main` يُطلق سير العمل تلقائيًا.
+- The workflow currently produces a **debug-signed APK**. It can be installed for internal testing, but it is not a production-signed release. To deliver stable future upgrades, create a private release keystore and configure its values as GitHub Actions secrets. Never commit the keystore or passwords to this repository.
+- The app stores records locally using IndexedDB/LocalStorage. The actual storage quota depends on the Android WebView, operating system, and device. The app cannot guarantee unlimited storage or a fixed 1 TB quota. Export and verify backups regularly.
+- A central server is **not connected by default**. Multi-device synchronization requires deploying the Node server on a private, persistent host, setting `JWT_SECRET` and `OWNER_SETUP_KEY`, configuring the server URL in the app, and testing sync in both directions. A green APK build does not mean a central database is connected.
+- The current finance screens cover trips, collections, expenses, and operational balances. Do not represent the app as a complete double-entry accounting/general-ledger system until journal entries, balanced debits/credits, account chart, and trial-balance reconciliation are implemented and tested.
+- Company legal/contact fields are intentionally blank in a fresh install. Enter and verify the customer's official name, address, phone, tax number, commercial registration, currency, and tax rate before issuing customer-facing documents.
+- The app must be tested on the actual customer's Android devices and with approved test data before production handoff. No automated build can guarantee zero defects.
 
-2. **سير العمل (Workflow)**:
-   ملف الإعداد موجود في المسار:
-   `.github/workflows/build-ejaz-apk.yml`
+## Central server environment
 
-3. **آلية العمل المؤتمتة**:
-   - تنزيل أحدث شفرة نظيفة من المستودع.
-   - تهيئة بيئة Node.js 22 و Java 17 Temurin و Gradle 8.2.
-   - تشغيل `npm ci` ثم `npm run build` لتجميع كود الويب كاملاً مع كافة الشاشات والبيانات.
-   - مزامنة كافة الملفات المترجمة إلى `app/src/main/assets/www/` مع فحص سلامتها.
-   - التحقق من توافق ملفات الموارد وسلامة توقيع صور أيقونات التطبيق (PNG).
-   - تشغيل `gradle assembleDebug --stacktrace --info`.
-   - قياس حجم ملف APK والتأكد من أنه كامل (يتجاوز 2 ميجابايت) لمنع مشكلة الـ APK الناقص.
-   - حفظ الملف وتسميته بنمط واضح: `VICTORIA-Logistics-ERP-v1.1.0-b[RUN_NUMBER].apk`.
-   - رفعه إلى قسم **Artifacts** في سير العمل، مع إنشاء Release تلقائي.
+Copy `.env.example` to a private server's `.env`, replace all example secrets with long random values, and keep the real file out of Git. The server should use persistent disk storage and a restricted HTTPS endpoint. Configure `OWNER_SETUP_KEY` only for the one-time owner setup, then rotate or disable it according to the deployment procedure.
 
-4. **خطوات تنزيل الـ APK الجديد**:
-   - افتح صفحة المستودع على GitHub.
-   - ادخل على تبويب **Actions**.
-   - اختر سير العمل **Build Victoria Logistics ERP APK**.
-   - انقر على آخر عملية بناء باللون الأخضر (Latest Successful Run).
-   - انزل إلى أسفل الصفحة إلى قسم **Artifacts**.
-   - حمّل الملف المضغوط `VICTORIA-Logistics-ERP-APK-v1.1.0`.
-   - فك الضغط وثبّت ملف الـ APK مباشرة على هاتف الأندرويد.
+## Data protection
 
----
-
-## 🔒 أمان البيانات والتثبيت التراكمي
-
-- **التثبيت فوق النسخة القديمة**: نظراً لأن `applicationId` مطابق (`sa.ejaz.transport`) وتم رفع `versionCode` إلى `2`، يمكن تثبيت التحديث مباشرة فوق النسخة المثبتة على الهاتف دون حذفها، مما يحافظ على التخزين المحلي وقواعد البيانات غير المحدودة.
-- **التخزين الدائم (IndexedDB)**: يستخدم التطبيق محرك تخزين غير محدود يطلب صلاحية `navigator.storage.persist()` في أندرويد لضمان عدم مسح البيانات المحلية بعد إغلاق التطبيق أو إعادة تشغيل الهاتف.
-- **المزامنة المركزية**: عند تشغيل الخادم المركزي وإدخال رابطه في شاشة الإعدادات، يقوم التطبيق بمزامنة البيانات تلقائياً بين أجهزة الموظفين ومدير النظام عبر الـ REST API الداخلي وخوارزميات تسوية التعارضات المتسلسلة.
+Before updating or migrating an installation, export a backup and confirm that the exported file can be imported into a test installation. Do not clear app data or uninstall the existing application until a backup has been verified.
