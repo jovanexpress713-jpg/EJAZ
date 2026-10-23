@@ -162,7 +162,7 @@ export class ApiClient {
     });
   }
 
-  public static async setupOwner(payload: { fullName: string; username: string; phone: string; password: string }): Promise<{ user: User; token: string }> {
+  public static async setupOwner(payload: { fullName: string; username: string; phone: string; password: string; setupKey?: string }): Promise<{ user: User; token: string }> {
     const res = await this.request<{ success: boolean; user: User; token: string }>('/api/auth/setup-owner', {
       method: 'POST',
       body: JSON.stringify(payload),
