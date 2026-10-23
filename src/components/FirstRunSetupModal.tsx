@@ -28,6 +28,7 @@ export const FirstRunSetupModal: React.FC<FirstRunSetupModalProps> = ({
   const [phone, setPhone] = useState('');
   const [setupKey, setSetupKey] = useState('');
   const [serverUrl, setServerUrl] = useState(() => ApiClient.getBaseUrl());
+  const [offlineMode, setOfflineMode] = useState(true);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [recoveryKey, setRecoveryKey] = useState<string>(() => generateRecoveryKey());
@@ -55,11 +56,11 @@ export const FirstRunSetupModal: React.FC<FirstRunSetupModalProps> = ({
       setErrorMsg('كلمة المرور يجب أن لا تقل عن 5 خانات.');
       return;
     }
-    if (!serverUrl.trim()) {
+    if (!offlineMode && !serverUrl.trim()) {
       setErrorMsg('أدخل رابط الخادم المركزي المحلي أولاً، مثل http://192.168.1.10:3000');
       return;
     }
-    if (!setupKey.trim()) {
+    if (!offlineMode && !setupKey.trim()) {
       setErrorMsg('أدخل مفتاح تهيئة الخادم الذي تم إنشاؤه على جهاز الخادم.');
       return;
     }
@@ -101,34 +102,56 @@ export const FirstRunSetupModal: React.FC<FirstRunSetupModalProps> = ({
         };
       }
 
-      // Configure the local central server before the first privileged setup request.
-      ApiClient.setBaseUrl(serverUrl);
-      let centralOwner: User;
-      try {
-        const serverResult = await ApiClient.setupOwner({
-          fullName: fullName.trim(),
-          username: username.trim().toLowerCase(),
-          phone: phone.trim(),
-          password,
-          setupKey: setupKey.trim(),
-        });
-        centralOwner = serverResult.user;
-      } catch (serverErr: any) {
-        setErrorMsg(serverErr?.message || 'تعذر إنشاء حساب المالك على الخادم المركزي. تحقق من الرابط ومفتاح التهيئة.');
-        return;
+      let activeOwner: User = owner;
+
+      if (offlineMode) {
+        // Standalone phone mode: create the owner locally without requiring a Windows server.
+        // This device will not automatically share data with other devices.
+        ApiClient.setToken(null);
+        ApiClient.setBaseUrl('');
+        StorageService.saveUser(owner);
+        StorageService.setCurrentUser(owner);
+        const settings = StorageService.getSettings();
+        settings.ownerPhone = phone.trim();
+        settings.syncConfig = {
+          ...(settings.syncConfig || {
+            deviceId: 'device_' + Date.now(),
+            deviceName: 'جهاز محلي',
+            autoSyncIntervalMinutes: 5,
+          }),
+          enabled: false,
+          mode: 'OFFLINE_ONLY',
+          serverUrl: '',
+          lastSyncStatus: undefined,
+          lastSyncError: undefined,
+        };
+        StorageService.saveSettings(settings, owner);
+      } else {
+        // Configure the central server before the first privileged setup request.
+        ApiClient.setBaseUrl(serverUrl);
+        try {
+          const serverResult = await ApiClient.setupOwner({
+            fullName: fullName.trim(),
+            username: username.trim().toLowerCase(),
+            phone: phone.trim(),
+            password,
+            setupKey: setupKey.trim(),
+          });
+          const centralOwner = serverResult.user;
+          owner.id = centralOwner.id;
+          activeOwner = { ...owner, id: centralOwner.id };
+          StorageService.saveUser(activeOwner);
+          StorageService.setCurrentUser(centralOwner || activeOwner);
+          const settings = StorageService.getSettings();
+          settings.ownerPhone = phone.trim();
+          StorageService.saveSettings(settings, activeOwner);
+        } catch (serverErr: any) {
+          setErrorMsg(serverErr?.message || 'تعذر إنشاء حساب المالك على الخادم المركزي. تحقق من الرابط ومفتاح التهيئة.');
+          return;
+        }
       }
 
-      // Save local cache only after the central server accepted owner setup.
-      owner.id = centralOwner.id;
-      StorageService.saveUser(owner);
-      StorageService.setCurrentUser(centralOwner || owner);
-
-      // Also update settings owner phone
-      const settings = StorageService.getSettings();
-      settings.ownerPhone = phone.trim();
-      StorageService.saveSettings(settings, owner);
-
-      onSetupComplete(owner);
+      onSetupComplete(activeOwner);
       onClose();
     } catch (err: any) {
       setErrorMsg(err?.message || 'حدث خطأ أثناء حفظ حساب المالك.');
@@ -177,6 +200,19 @@ export const FirstRunSetupModal: React.FC<FirstRunSetupModalProps> = ({
                 />
                 <UserIcon className="w-4 h-4 text-slate-400 absolute left-2.5 top-2.5" />
               </div>
+              <label className="flex items-start gap-2 rounded-xl border border-orange-300 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/30 p-3 text-xs">
+                <input
+                  type="checkbox"
+                  checked={offlineMode}
+                  onChange={e => setOfflineMode(e.target.checked)}
+                  className="mt-0.5 accent-orange-500"
+                />
+                <span>
+                  <span className="block font-bold text-slate-800 dark:text-slate-100">تشغيل محلي على هذا الهاتف دون خادم مركزي</span>
+                  <span className="block mt-1 text-slate-600 dark:text-slate-400">مناسب للتجربة الآن. البيانات تبقى على هذا الجهاز ولا تتم مزامنتها تلقائيًا مع أجهزة أخرى.</span>
+                </span>
+              </label>
+              {!offlineMode && (
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   رابط الخادم المركزي المحلي (على نفس شبكة Wi-Fi)
@@ -206,6 +242,7 @@ export const FirstRunSetupModal: React.FC<FirstRunSetupModalProps> = ({
                   className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-orange-500"
                 />
               </div>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-3">
