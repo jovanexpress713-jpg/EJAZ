@@ -1,12 +1,11 @@
 /**
  * Unlimited Storage Engine for Ejaz Transport ERP
  * 
- * Provides virtually endless storage using browser IndexedDB and the 
- * Persistent Storage API (navigator.storage.persist()).
+ * Provides device-local storage using browser IndexedDB and the
+ * Persistent Storage API when the browser grants it. Actual capacity is device/browser limited.
  * 
- * Bypasses the 5MB browser localStorage restriction, allowing hundreds of thousands
- * of trips, waybills, invoices, driver records, and audit logs to be stored securely 
- * without any quota limits or automatic eviction by the browser.
+ * Uses IndexedDB to avoid localStorage's small quota. It does not provide unlimited capacity;
+ * actual quota and persistence depend on the device, operating system, and WebView/browser.
  */
 
 const DB_NAME = 'ejaz_unlimited_db';
@@ -31,7 +30,7 @@ class UnlimitedStorageEngine {
   }
 
   /**
-   * Initialize or retrieve the IndexedDB connection with 1TB Multi-Store architecture
+   * Initialize or retrieve the device-local IndexedDB connection
    */
   public async getDB(): Promise<IDBDatabase> {
     if (this.dbPromise) return this.dbPromise;
@@ -80,7 +79,7 @@ class UnlimitedStorageEngine {
   }
 
   /**
-   * Automatically requests browser persistent storage so data is NEVER evicted
+   * Request browser persistent storage; the browser may deny the request and no API can guarantee zero eviction
    */
   public async autoRequestPersistence(): Promise<boolean> {
     try {
@@ -101,7 +100,7 @@ class UnlimitedStorageEngine {
   }
 
   /**
-   * Store a value in IndexedDB (virtually unlimited capacity)
+   * Store a value in IndexedDB within the available device/browser quota
    */
   public async setItem<T>(key: string, value: T): Promise<void> {
     try {
@@ -318,7 +317,7 @@ class UnlimitedStorageEngine {
   }
 
   /**
-   * Perform a quick read/write health test verifying 1TB capacity engine
+   * Perform a small read/write integrity test for the local storage engine
    */
   public async verify1TBCapacity(): Promise<{
     success: boolean;
@@ -330,7 +329,7 @@ class UnlimitedStorageEngine {
     try {
       const testKey = 'ejaz_1tb_test_' + Date.now();
       const samplePayload = {
-        test: '1TB_ENTERPRISE_INTEGRITY_CHECK',
+        test: 'LOCAL_STORAGE_INTEGRITY_CHECK',
         timestamp: new Date().toISOString(),
         chunk: 'A'.repeat(50000), // 50KB test chunk
       };
@@ -348,7 +347,7 @@ class UnlimitedStorageEngine {
           success: true,
           writeSpeedMs,
           persisted,
-          message: `تم التحقق بنجاح: محرك التخزين بسعة 1 تيرابايت يعمل بأقصى كفاءة (${writeSpeedMs} مللي ثانية) مع حماية ضد المسح التلقائي.`,
+          message: `نجح اختبار الكتابة والقراءة المحلي بحجم 50 كيلوبايت خلال ${writeSpeedMs} مللي ثانية. السعة الفعلية يحددها الجهاز والمتصفح، وحماية التخزين الدائم ليست مضمونة.`,
         };
       }
       return {
@@ -368,7 +367,7 @@ class UnlimitedStorageEngine {
   }
 
   /**
-   * Get comprehensive storage estimate, 1 Terabyte scale metrics and quota details
+   * Get the browser-reported storage estimate and actual available quota
    */
   public async getStorageEstimate(): Promise<{
     supported: boolean;
@@ -426,14 +425,14 @@ class UnlimitedStorageEngine {
       usageBytes,
       quotaBytes,
       usageFormatted: formatBytes(usageBytes),
-      quotaFormatted: quotaBytes > 0 ? formatBytes(quotaBytes) : '1 تيرابايت مفتوحة (1 TB Enterprise)',
+      quotaFormatted: quotaBytes > 0 ? formatBytes(quotaBytes) : 'غير متاح من المتصفح',
       usagePercent: Number(usagePercent.toFixed(3)),
-      isUnlimited: true,
+      isUnlimited: false,
       oneTerabyteBytes: ONE_TERABYTE_BYTES,
       usageOf1TBPercent: Number(usageOf1TBPercent.toFixed(4)),
       remaining1TBFormatted: formatBytes(remainingBytes),
-      tierLabel: 'سعة المؤسسات الفائقة (1 Terabyte Enterprise Storage)',
-      tripsCapacityEstimate: 'أكثر من 10,000,000 رحلة وسند مالي',
+      tierLabel: isPersistent ? 'IndexedDB محلي مع طلب تخزين دائم مُفعّل' : 'IndexedDB محلي؛ السعة والحفظ الدائم حسب الجهاز والمتصفح',
+      tripsCapacityEstimate: 'لا يمكن تقدير عدد السجلات بدقة؛ يعتمد على حجمها والسعة المتاحة',
       blobsCount,
     };
   }
