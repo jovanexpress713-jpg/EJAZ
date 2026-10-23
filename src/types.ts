@@ -404,7 +404,7 @@ export interface SyncConfig {
 
 export interface SyncOutboxItem {
   id: string;
-  entityType: 'TRIP' | 'CUSTOMER' | 'DRIVER' | 'TRUCK' | 'MAINTENANCE' | 'COLLECTION' | 'EXPENSE' | 'USER' | 'SETTINGS';
+  entityType: 'TRIP' | 'CUSTOMER' | 'DRIVER' | 'TRUCK' | 'MAINTENANCE' | 'COLLECTION' | 'EXPENSE' | 'HANDOVER' | 'USER' | 'SETTINGS';
   entityId: string;
   action: 'CREATE' | 'UPDATE' | 'DELETE' | 'APPROVE';
   payload: any;
