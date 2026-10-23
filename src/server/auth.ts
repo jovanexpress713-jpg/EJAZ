@@ -3,7 +3,10 @@ import { Request, Response, NextFunction } from 'express';
 import { Database } from './database';
 import { User, UserRole, UserPermissions } from '../types';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'ejaz_logistics_enterprise_secret_salt_2026';
+const JWT_SECRET = process.env.JWT_SECRET || (process.env.NODE_ENV === 'production' ? '' : 'development-only-change-me');
+if (!JWT_SECRET) {
+  throw new Error('JWT_SECRET must be configured before starting the server in production.');
+}
 
 export interface AuthenticatedRequest extends Request {
   user?: User;
