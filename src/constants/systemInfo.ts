@@ -2,7 +2,7 @@
  * Copyright © فكتوريا لاين سوفت للأنظمة والبرمجة
  * All Rights Reserved.
  * Developed and Programmed by Victoria Line Soft
- * Contact: 771119726
+ * Contact: +967771119726
  */
 
 export interface SystemInfoMetadata {
@@ -45,11 +45,11 @@ export const SYSTEM_INFO: SystemInfoMetadata = Object.freeze({
     fullName: 'فكتوريا لاين سوفت للأنظمة والبرمجة',
     englishName: 'Victoria Line Soft',
     activity: 'للأنظمة والبرمجة',
-    contactNumber: '771119726',
-    contactUrl: 'tel:771119726',
+    contactNumber: '+967771119726',
+    contactUrl: 'tel:+967771119726',
     whatsappUrl: 'https://wa.me/967771119726',
-    officialCopyright: 'نظام إيجاز © جميع الحقوق محفوظة\nتم التصميم والتطوير والبرمجة بواسطة فكتوريا لاين سوفت للأنظمة والبرمجة\n771119726',
-    footerCopyright: 'نظام إيجاز © جميع الحقوق محفوظة | تطوير وبرمجة فكتوريا لاين سوفت للأنظمة والبرمجة | 771119726',
+    officialCopyright: 'نظام إيجاز © جميع الحقوق محفوظة\nتم التصميم والتطوير والبرمجة بواسطة فكتوريا لاين سوفت للأنظمة والبرمجة\n+967771119726',
+    footerCopyright: 'نظام إيجاز © جميع الحقوق محفوظة | تطوير وبرمجة فكتوريا لاين سوفت للأنظمة والبرمجة | +967771119726',
   }),
   license: Object.freeze({
     type: 'ترخيص برمجي تجاري معتمد',

@@ -29,6 +29,7 @@ interface FinancialViewProps {
   customers: Customer[];
   currentUser: User;
   onRefresh: () => void;
+  initialSubTab?: 'COLLECTIONS' | 'EXPENSES';
 }
 
 export const FinancialView: React.FC<FinancialViewProps> = ({
@@ -38,8 +39,15 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
   customers,
   currentUser,
   onRefresh,
+  initialSubTab,
 }) => {
-  const [activeTab, setActiveTab] = useState<'COLLECTIONS' | 'EXPENSES'>('COLLECTIONS');
+  const [activeTab, setActiveTab] = useState<'COLLECTIONS' | 'EXPENSES'>(initialSubTab || 'COLLECTIONS');
+  
+  React.useEffect(() => {
+    if (initialSubTab) {
+      setActiveTab(initialSubTab);
+    }
+  }, [initialSubTab]);
   const [searchTerm, setSearchTerm] = useState('');
   
   // Modals

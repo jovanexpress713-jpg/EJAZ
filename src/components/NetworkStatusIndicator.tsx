@@ -11,7 +11,8 @@ import {
   X,
   Share,
   PlusSquare,
-  RefreshCw
+  RefreshCw,
+  Database
 } from 'lucide-react';
 import { StorageService } from '../services/storage';
 import { SyncEngine } from '../services/syncEngine';
@@ -22,8 +23,14 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
 }
 
-export const NetworkStatusIndicator: React.FC = () => {
-  const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
+export interface NetworkStatusIndicatorProps {
+  inMenu?: boolean;
+}
+
+export const NetworkStatusIndicator: React.FC<NetworkStatusIndicatorProps> = ({ inMenu = false }) => {
+  const [isOnline, setIsOnline] = useState<boolean>(true);
+  const [serverPing, setServerPing] = useState<number | null>(null);
+  const [serverDetails, setServerDetails] = useState<{ sequence?: number; lastUpdated?: string } | null>(null);
   const [showStatusModal, setShowStatusModal] = useState<boolean>(false);
   const [showToast, setShowToast] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'online' | 'offline' }>({
@@ -43,11 +50,43 @@ export const NetworkStatusIndicator: React.FC = () => {
   const [isManualSyncing, setIsManualSyncing] = useState<boolean>(false);
   const [manualSyncMsg, setManualSyncMsg] = useState<string | null>(null);
 
+  const checkRealServer = async () => {
+    if (typeof window === 'undefined') return;
+    if (!navigator.onLine) {
+      setIsOnline(false);
+      return;
+    }
+    const start = performance.now();
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+      const res = await fetch('/api/sync/status', { signal: controller.signal });
+      clearTimeout(timeoutId);
+      const latency = Math.round(performance.now() - start);
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setIsOnline(true);
+        setServerPing(latency);
+        if (data) {
+          setServerDetails({
+            sequence: data.serverSequence,
+            lastUpdated: data.lastUpdated,
+          });
+        }
+      } else {
+        setIsOnline(false);
+      }
+    } catch {
+      setIsOnline(false);
+    }
+  };
+
   const handleManualSync = async () => {
     setIsManualSyncing(true);
     setManualSyncMsg(null);
     try {
       const res = await SyncEngine.syncWithServer();
+      await checkRealServer();
       if (res.success) {
         setManualSyncMsg(`تمت المزامنة بنجاح! تم إرسال ${res.pushedCount} عملية وتحديث السجلات المركزية.`);
       } else {
@@ -61,6 +100,9 @@ export const NetworkStatusIndicator: React.FC = () => {
   };
 
   useEffect(() => {
+    checkRealServer();
+    const serverPollInterval = setInterval(checkRealServer, 6000);
+
     // Check if running inside an iframe (like AI Studio preview)
     let inIframe = false;
     try {
@@ -83,7 +125,7 @@ export const NetworkStatusIndicator: React.FC = () => {
     setIsAndroid(isAndroidDevice);
 
     const handleOnline = () => {
-      setIsOnline(true);
+      checkRealServer();
       setToastMessage({ text: 'تم استعادة الاتصال بالإنترنت – جميع العمليات متزامنة محلياً', type: 'online' });
       setShowToast(true);
       setTimeout(() => setShowToast(false), 4500);
@@ -112,6 +154,7 @@ export const NetworkStatusIndicator: React.FC = () => {
     window.addEventListener('appinstalled', handleAppInstalled);
 
     return () => {
+      clearInterval(serverPollInterval);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -141,28 +184,75 @@ export const NetworkStatusIndicator: React.FC = () => {
 
   return (
     <>
-      {/* Network & Central Sync Capsule */}
-      <div className="flex items-center gap-1.5">
+      {/* Network & Central Database Sync Trigger */}
+      {inMenu ? (
         <button
+          id="header-database-sync-pill"
           type="button"
           onClick={() => setShowStatusModal(true)}
-          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold transition border cursor-pointer ${
-            isOnline 
-              ? 'bg-slate-800/90 text-emerald-400 border-slate-700 hover:bg-slate-700/90' 
-              : 'bg-amber-950/80 text-amber-300 border-amber-700 hover:bg-amber-900/80 animate-pulse'
-          }`}
-          title={isOnline ? 'متصل بالخادم المركزي وقاعدة البيانات' : 'يعمل بدون إنترنت (Offline Mode)'}
+          className="w-full text-right p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700/80 transition flex items-center justify-between cursor-pointer select-none"
+          title="فحص حالة الخادم المركزي والمزامنة وقاعدة البيانات"
         >
-          <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-400' : 'bg-amber-400 animate-ping'}`} />
-          {isOnline ? <Wifi className="w-3.5 h-3.5 text-emerald-400" /> : <WifiOff className="w-3.5 h-3.5 text-amber-400" />}
-          <span>{isOnline ? 'الخادم المركزي' : 'أوفلاين (شغال)'}</span>
-          {pendingCount > 0 && (
-            <span className="px-1.5 py-0.2 bg-amber-500 text-slate-900 rounded-full text-[9px] font-black">
-              {pendingCount}
+          <div className="flex items-center gap-2.5">
+            <div className="p-1.5 rounded-lg bg-sky-500/10 text-sky-500">
+              <Database className="w-4 h-4 shrink-0" />
+            </div>
+            <div className="flex flex-col text-right leading-tight">
+              <span className="text-xs font-bold text-slate-800 dark:text-white">الخادم المركزي وقاعدة البيانات</span>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">
+                {isOnline ? `متصل (${serverPing ? serverPing + 'ms' : 'مستقر'})` : 'وضع العمل المحلي (أوفلاين)'}
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className={`w-2 h-2 rounded-full ${
+              isOnline ? 'bg-emerald-500 shadow-[0_0_6px_#10B981]' : 'bg-rose-500 animate-ping'
+            }`} />
+            <span className={`text-[11px] font-bold ${
+              isOnline ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500'
+            }`}>
+              {isOnline ? 'متصل' : 'غير متصل'}
             </span>
-          )}
+          </div>
         </button>
-      </div>
+      ) : (
+        <div className="flex items-center">
+          <button
+            id="header-database-sync-pill"
+            type="button"
+            onClick={() => setShowStatusModal(true)}
+            className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-bold transition border cursor-pointer select-none ${
+              isOnline 
+                ? 'bg-[#0B1528] text-white border-cyan-500/40 hover:border-cyan-400 hover:bg-[#0E1C33] shadow-sm' 
+                : 'bg-rose-950/80 text-rose-200 border-rose-600 hover:bg-rose-900/80 animate-pulse'
+            }`}
+            title={isOnline ? `الخادم المركزي وقاعدة البيانات متصلة (${serverPing ? serverPing + 'ms' : 'مستقر'})` : 'غير متصل بالخادم المركزي (يعمل محلياً بأمان)'}
+          >
+            {/* Database Stack Icon */}
+            <Database className={`w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 ${isOnline ? 'text-sky-400' : 'text-rose-400'}`} />
+            
+            {/* Status Dot */}
+            <span className={`w-2 h-2 rounded-full shrink-0 ${
+              isOnline 
+                ? 'bg-emerald-400 shadow-[0_0_8px_#34D399]' 
+                : 'bg-rose-500 shadow-[0_0_8px_#F43F5E] animate-ping'
+            }`} />
+
+            {/* Text Status */}
+            <span className={`text-[11px] sm:text-xs font-bold tracking-wide ${
+              isOnline ? 'text-emerald-400 dark:text-emerald-300' : 'text-rose-300'
+            }`}>
+              {isOnline ? 'متصل' : 'غير متصل'}
+            </span>
+
+            {pendingCount > 0 && (
+              <span className="px-1.5 py-0.2 bg-amber-500 text-slate-950 rounded-full text-[9px] font-black font-mono">
+                {pendingCount}
+              </span>
+            )}
+          </button>
+        </div>
+      )}
 
       {/* Floating Network Transition Toast */}
       {showToast && (

@@ -41,6 +41,7 @@ import { SYSTEM_INFO } from './constants/systemInfo';
 import { AboutSystemModal } from './components/AboutSystemModal';
 import { MobileSavePointsModal } from './components/MobileSavePointsModal';
 import { DailyHandoverModal } from './components/DailyHandoverModal';
+import { Phone } from 'lucide-react';
 
 export default function App() {
   // App Stage: 'SPLASH' | 'LOGIN' | 'MAIN'
@@ -357,7 +358,7 @@ export default function App() {
           />
         )}
 
-        {currentTabUpper === 'DRIVER_TRACKING' && (
+        {(currentTabUpper === 'DRIVER_TRACKING' || currentTabUpper === 'LOCATIONS') && (
           <DriverTrackingLedgerView
             trips={trips}
             drivers={drivers}
@@ -390,7 +391,7 @@ export default function App() {
           />
         )}
 
-        {currentTabUpper === 'FINANCIAL' && (
+        {(currentTabUpper === 'FINANCIAL' || currentTabUpper === 'EXPENSES' || currentTabUpper === 'COLLECTIONS') && (
           <FinancialView
             collections={collections}
             expenses={expenses}
@@ -398,6 +399,7 @@ export default function App() {
             customers={customers}
             currentUser={currentUser}
             onRefresh={refreshData}
+            initialSubTab={currentTabUpper === 'EXPENSES' ? 'EXPENSES' : 'COLLECTIONS'}
           />
         )}
 
@@ -426,44 +428,97 @@ export default function App() {
         )}
       </main>
 
-      {/* Persistent Official Footer */}
-      <footer className="bg-[#0F172A] text-slate-400 py-3.5 sm:py-4 text-xs border-t border-slate-800 select-none no-print">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 flex flex-col md:flex-row items-center justify-between gap-3 text-center md:text-right">
-          {/* Official Required Copyright Statement */}
-          <div className="flex flex-wrap items-center justify-center md:justify-start gap-1 sm:gap-1.5 text-[11px] sm:text-xs leading-relaxed">
-            <span className="text-slate-200 font-bold">
-              نظام إيجاز © جميع الحقوق محفوظة
-            </span>
-            <span className="text-slate-600 hidden sm:inline">|</span>
-            <span className="text-slate-400">
-              تطوير وبرمجة{' '}
-              <strong className="text-orange-400 font-bold hover:text-orange-300 transition">
-                {SYSTEM_INFO.developer.fullName}
-              </strong>
-            </span>
-            <span className="text-slate-600 hidden sm:inline">|</span>
-            <a
-              href={SYSTEM_INFO.developer.contactUrl}
-              className="font-mono font-bold text-amber-400 hover:text-amber-300 transition px-1.5 py-0.5 bg-slate-800/80 rounded border border-slate-700 inline-block text-[11px]"
-              dir="ltr"
-              title="اتصال مباشر بالشركة المطورة"
-            >
-              {SYSTEM_INFO.developer.contactNumber}
-            </a>
-          </div>
+      {/* Persistent Official Footer matching Reference Design */}
+      <footer className="bg-[#070E1E] text-slate-400 py-3 sm:py-4 px-3 sm:px-6 select-none no-print border-t border-slate-800/80">
+        <div className="max-w-7xl mx-auto">
+          {/* Outer Rounded Container with Deep Navy Background and Blue Border */}
+          <div 
+            className="bg-[#081225] border border-blue-900/60 rounded-2xl px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3 sm:gap-4 shadow-xl"
+            dir="rtl"
+          >
+            {/* RIGHT SIDE: 1. Logo (Ejaz ERP) & 2. Copyright Info */}
+            <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+              {/* 1. شعار إيجاز ERP مع الأيقونة الهندسية الذهبية */}
+              <div className="flex items-center gap-2.5 shrink-0">
+                {/* Golden Isometric Hexagon Emblem */}
+                <svg viewBox="0 0 44 44" className="w-9 h-9 sm:w-10 sm:h-10 shrink-0" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path 
+                    d="M22 3L39 12.5V31.5L22 41L5 31.5V12.5L22 3Z" 
+                    stroke="#F59E0B" 
+                    strokeWidth="2.5" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                  />
+                  <path 
+                    d="M5 31.5L22 41L39 31.5" 
+                    stroke="#D97706" 
+                    strokeWidth="2" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                  />
+                  <path 
+                    d="M8 35.5L22 43L36 35.5" 
+                    stroke="#B45309" 
+                    strokeWidth="1.5" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    opacity="0.6" 
+                  />
+                  <path d="M12 29V23L16 20V29H12Z" fill="#F59E0B" />
+                  <path d="M19 29V17L23 14V29H19Z" fill="#FBBF24" />
+                  <path d="M26 29V11L30 8V29H26Z" fill="#F59E0B" />
+                </svg>
 
-          {/* Left Side: System Version & About Trigger */}
-          <div className="flex items-center gap-2 text-[11px]">
-            <span className="bg-slate-800 text-orange-400 font-mono text-[10px] font-bold px-2 py-0.5 rounded border border-slate-700">
-              v{SYSTEM_INFO.version} PRO
-            </span>
-            <button
-              type="button"
-              onClick={() => setIsAboutModalOpen(true)}
-              className="text-slate-400 hover:text-white hover:underline transition px-2 py-1 rounded cursor-pointer"
-            >
-              حول النظام
-            </button>
+                {/* Typography: إيجــاز / ERP */}
+                <div className="flex flex-col text-right leading-none justify-center">
+                  <span className="text-white font-black text-lg sm:text-xl tracking-tight">إيجـاز</span>
+                  <span className="text-amber-500 font-black text-[11px] sm:text-xs tracking-wider mt-0.5">ERP</span>
+                </div>
+              </div>
+
+              {/* Vertical Divider */}
+              <div className="h-8 w-px bg-slate-700/80 hidden sm:block shrink-0" />
+
+              {/* 2. نص حقوق الملكية واسم الشركة */}
+              <div className="flex flex-col text-right leading-tight">
+                <span className="text-slate-100 font-bold text-xs sm:text-[13px]">© جميع الحقوق محفوظة</span>
+                <span className="text-amber-400 font-bold text-xs sm:text-[13px] mt-0.5">فكتوريا لاين سوفت للأنظمة والبرمجة</span>
+              </div>
+            </div>
+
+            {/* LEFT SIDE: 3. Version & About trigger & 4. Phone Number */}
+            <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+              {/* 3. قسم حول النظام ورقم الإصدار V2.6.0 PRO */}
+              <div className="flex items-center gap-2.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsAboutModalOpen(true)}
+                  className="text-slate-200 hover:text-white font-bold text-xs sm:text-[13px] transition cursor-pointer"
+                  title="عرض تفاصيل ترخيص وحماية النظام"
+                >
+                  حول النظام
+                </button>
+
+                {/* Golden Version Badge */}
+                <div className="px-3 py-1 rounded-full border border-amber-500/90 text-amber-400 font-bold font-mono text-xs sm:text-[13px] tracking-wide bg-amber-500/10 shadow-xs">
+                  V{SYSTEM_INFO.version} PRO
+                </div>
+              </div>
+
+              {/* Vertical Divider */}
+              <div className="h-8 w-px bg-slate-700/80 hidden sm:block shrink-0" />
+
+              {/* 4. كبسولة رقم التواصل +967771119726 مع أيقونة الهاتف الذهبية */}
+              <a
+                href={SYSTEM_INFO.developer.contactUrl}
+                className="px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl border border-blue-500/50 hover:border-blue-400 bg-blue-950/40 hover:bg-blue-900/60 text-white font-mono font-bold text-xs sm:text-sm transition flex items-center gap-2 cursor-pointer shadow-sm shrink-0"
+                dir="ltr"
+                title="اتصال مباشر بالشركة المطورة"
+              >
+                <Phone className="w-4 h-4 text-amber-400 fill-current shrink-0" />
+                <span className="tracking-wider">{SYSTEM_INFO.developer.contactNumber}</span>
+              </a>
+            </div>
           </div>
         </div>
       </footer>
